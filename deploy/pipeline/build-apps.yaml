@@ -64,7 +64,7 @@ spec:
                   - name: repo-revision
                     value: "$(params.repo-revision)"
                   - name: app-path
-                    value: "${APP_NAME}"
+                    value: "src/${APP_NAME}"
                   - name: app-name
                     value: "${APP_NAME}"
                   - name: namespace
@@ -152,7 +152,7 @@ spec:
                   - name: repo-revision
                     value: "$(params.repo-revision)"
                   - name: app-path
-                    value: "${APP_NAME}"
+                    value: "src/${APP_NAME}"
                   - name: app-name
                     value: "${APP_NAME}"
                   - name: namespace
@@ -240,7 +240,7 @@ spec:
                   - name: repo-revision
                     value: "$(params.repo-revision)"
                   - name: app-path
-                    value: "${APP_NAME}"
+                    value: "src/${APP_NAME}"
                   - name: app-name
                     value: "${APP_NAME}"
                   - name: namespace
