@@ -39,7 +39,7 @@ spec:
     - name: deps
       type: string
       description: "Comma-separated list of additional dependencies to add during camel export (e.g. camel-observability-services)"
-      default: "camel-direct,camel-observability-services,mvn:org.apache.camel.quarkus:camel-quarkus-platform-http,mvn:org.apache.activemq:artemis-jms-client,mvn:org.messaginghub:pooled-jms"
+      default: "camel-direct,camel-observability-services,mvn:org.apache.camel.quarkus:camel-quarkus-platform-http,mvn:org.apache.activemq:artemis-jms-client:2.44.0,mvn:org.messaginghub:pooled-jms:3.2.2"
 
   workspaces:
     - name: shared-workspace
