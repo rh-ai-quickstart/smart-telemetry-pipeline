@@ -1,5 +1,0 @@
-Analyze this failed request trace.
-Reconstruct the service call tree and provide a root cause analysis.
-IMPORTANT: include the exact service-level error messages from logs/events
-and JSON error bodies (for example fields like "message", "error",
-"service", HttpOperationFailedException text).
