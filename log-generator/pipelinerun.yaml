@@ -1,0 +1,21 @@
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  name: deploy-log-generator-run
+spec:
+  pipelineRef:
+    name: deploy-log-generator
+  params:
+    - name: namespace
+      value: NAMESPACE
+    - name: otel-collector-endpoint
+      value: "http://camel-otel-collector-opentelemetry-collector.NAMESPACE.svc:4317"
+  workspaces:
+    - name: shared-workspace
+      volumeClaimTemplate:
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi

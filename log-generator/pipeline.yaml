@@ -1,0 +1,236 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: deploy-log-generator
+spec:
+  params:
+    - name: namespace
+      type: string
+      default: slog-analyzer
+    - name: otel-collector-endpoint
+      type: string
+      default: "http://camel-otel-collector-opentelemetry-collector.slog-analyzer.svc:4317"
+    - name: camel-image
+      type: string
+      default: "quay.io/mcarlett/camel-launcher:4.20.0"
+  workspaces:
+    - name: shared-workspace
+
+  tasks:
+    - name: init-workspace
+      taskRef:
+        name: init-workspace
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+
+    - name: prepare-sources
+      runAfter:
+        - init-workspace
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+      taskSpec:
+        params:
+          - name: camel-image
+            type: string
+        workspaces:
+          - name: source
+        steps:
+          - name: create-files
+            image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+            securityContext:
+              runAsUser: 0
+            script: |
+              #!/usr/bin/env bash
+              set -euo pipefail
+              BUILD="$(workspaces.source.path)/build"
+              mkdir -p "${BUILD}"
+
+              # Camel route
+              cat > "${BUILD}/log-generator.camel.yaml" << 'ROUTE'
+              # Simulates order processing with random success/failure outcomes (30% failure rate)
+              # to generate realistic log data for testing the error analyzer
+              - route:
+                  id: order-processor
+                  from:
+                    uri: timer:orderProcessor
+                    parameters:
+                      period: "{{timer.order.period:2000}}"
+                      fixedRate: true
+                    steps:
+                      - setVariable:
+                          name: orderId
+                          simple: "ORD-${random(10000,99999)}"
+                      - log:
+                          message: "Received new order ${variable.orderId} from customer ${random(1000,9999)}"
+                          loggingLevel: INFO
+                          logName: com.example.order.OrderService
+                      - log:
+                          message: "Validating order ${variable.orderId}: checking inventory and pricing"
+                          loggingLevel: INFO
+                          logName: com.example.order.ValidationService
+                      - choice:
+                          when:
+                            - simple: "${random(0,100)} < 30"
+                              steps:
+                                - choice:
+                                    when:
+                                      - simple: "${random(0,100)} < 33"
+                                        steps:
+                                          - log:
+                                              message: "Connecting to database for order ${variable.orderId}"
+                                              loggingLevel: INFO
+                                              logName: com.example.order.DatabaseService
+                                          - throwException:
+                                              message: "Database connection failed: Connection refused to postgres:5432 while processing order ${variable.orderId}"
+                                              exceptionType: java.lang.RuntimeException
+                                      - simple: "${random(0,100)} < 66"
+                                        steps:
+                                          - log:
+                                              message: "Initiating payment for order ${variable.orderId}"
+                                              loggingLevel: INFO
+                                              logName: com.example.payment.PaymentGateway
+                                          - throwException:
+                                              message: "Network timeout while connecting to payment gateway api.stripe.com for order ${variable.orderId}"
+                                              exceptionType: java.lang.RuntimeException
+                                    otherwise:
+                                      steps:
+                                        - log:
+                                            message: "Verifying user authentication for order ${variable.orderId}"
+                                            loggingLevel: INFO
+                                            logName: com.example.auth.AuthService
+                                        - throwException:
+                                            message: "Authentication failed: Invalid JWT token signature for order ${variable.orderId}"
+                                            exceptionType: java.lang.RuntimeException
+                          otherwise:
+                            steps:
+                              - log:
+                                  message: "Payment processed successfully for order ${variable.orderId}"
+                                  loggingLevel: INFO
+                                  logName: com.example.payment.PaymentGateway
+                              - log:
+                                  message: "Order ${variable.orderId} completed successfully"
+                                  loggingLevel: INFO
+                                  logName: com.example.order.OrderService
+              - route:
+                  id: health-checker
+                  from:
+                    uri: timer:healthCheck
+                    parameters:
+                      period: 5000
+                      fixedRate: true
+                    steps:
+                      - log:
+                          message: "Health check: All systems operational"
+                          loggingLevel: DEBUG
+                          logName: com.example.health.HealthChecker
+              ROUTE
+
+              # Application properties
+              cat > "${BUILD}/application-dev.properties" << 'PROPS'
+              camel.opentelemetry2.enabled = true
+              camel.opentelemetry2.traceProcessors = true
+              camel.jbang.dependencies=org.apache.camel:camel-opentelemetry2
+              PROPS
+
+              # OTel agent properties
+              cat > "${BUILD}/agent.properties" << 'AGENT'
+              otel.javaagent.debug=false
+              otel.service.name=log-generator
+              otel.traces.exporter=otlp
+              otel.metrics.exporter=none
+              otel.logs.exporter=otlp
+              AGENT
+
+              # Dockerfile
+              cat > "${BUILD}/Dockerfile" << DOCKERFILE
+              FROM $(params.camel-image)
+
+              USER root
+
+              RUN curl -fsSL -o /opt/opentelemetry-javaagent.jar https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/latest/download/opentelemetry-javaagent.jar
+
+              COPY log-generator.camel.yaml /routes/
+              COPY application-dev.properties /routes/
+              COPY agent.properties /opt/agent.properties
+
+              RUN chmod -R a+r /opt/opentelemetry-javaagent.jar /opt/agent.properties /routes/
+
+              USER ubuntu
+              WORKDIR /tmp
+
+              ENV HOME=/tmp
+              ENV JAVA_OPTS="-javaagent:/opt/opentelemetry-javaagent.jar"
+              ENV OTEL_JAVAAGENT_CONFIGURATION_FILE=/opt/agent.properties
+
+              CMD ["run", "/routes/log-generator.camel.yaml", "/routes/application-dev.properties", "--dep=org.apache.camel:camel-opentelemetry2"]
+              DOCKERFILE
+
+              echo "Build context ready:"
+              ls -la "${BUILD}"
+      params:
+        - name: camel-image
+          value: $(params.camel-image)
+
+    - name: build-image
+      runAfter:
+        - prepare-sources
+      taskRef:
+        resolver: cluster
+        params:
+          - name: kind
+            value: task
+          - name: name
+            value: buildah
+          - name: namespace
+            value: openshift-pipelines
+      params:
+        - name: IMAGE
+          value: image-registry.openshift-image-registry.svc:5000/$(params.namespace)/log-generator:latest
+        - name: DOCKERFILE
+          value: Dockerfile
+        - name: CONTEXT
+          value: .
+        - name: TLS_VERIFY
+          value: "false"
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+          subPath: build
+
+    - name: deploy
+      runAfter:
+        - build-image
+      taskRef:
+        resolver: cluster
+        params:
+          - name: kind
+            value: task
+          - name: name
+            value: openshift-client
+          - name: namespace
+            value: openshift-pipelines
+      workspaces:
+        - name: manifest_dir
+          workspace: shared-workspace
+      params:
+        - name: SCRIPT
+          value: |
+            NS="$(params.namespace)"
+            APP="log-generator"
+            IMAGE="image-registry.openshift-image-registry.svc:5000/${NS}/${APP}:latest"
+            OTEL_ENDPOINT="$(params.otel-collector-endpoint)"
+
+            oc create deployment ${APP} \
+              --image="${IMAGE}" \
+              --replicas=0 \
+              -n "${NS}" --dry-run=client -o yaml | oc apply -f -
+
+            oc set env deployment/${APP} -n "${NS}" \
+              OTEL_EXPORTER_OTLP_ENDPOINT="${OTEL_ENDPOINT}" \
+              OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+
+            oc scale deployment/${APP} -n "${NS}" --replicas=1
+            oc rollout status deployment/${APP} -n "${NS}" --timeout=120s
+            echo "Log generator deployed successfully."
