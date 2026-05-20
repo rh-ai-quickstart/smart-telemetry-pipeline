@@ -16,17 +16,61 @@ spec:
       type: string
       description: Target namespace for the container images
       default: slog-analyzer
-    - name: camel-image
+    - name: camel-launcher-version
       type: string
-      description: Image containing the Camel CLI for export
-      default: "quay.io/mcarlett/camel-launcher:4.20.0"
+      description: Camel version for the launcher image
+      default: "4.20.0"
     - name: runtime-version
       type: string
       description: "Quarkus version. If empty, uses the default from camel export"
       default: ""
 
+  workspaces:
+    - name: shared-workspace
+      description: Workspace for building the camel-launcher image
+
   tasks:
+    # Step 0a: Prepare camel-launcher build context
+    - name: build-camel-launcher
+      taskRef:
+        name: build-camel-launcher
+      params:
+        - name: camel-launcher-version
+          value: $(params.camel-launcher-version)
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+
+    # Step 0b: Build and push camel-launcher image
+    - name: build-camel-launcher-image
+      runAfter:
+        - build-camel-launcher
+      taskRef:
+        resolver: cluster
+        params:
+          - name: kind
+            value: task
+          - name: name
+            value: buildah
+          - name: namespace
+            value: openshift-pipelines
+      params:
+        - name: IMAGE
+          value: image-registry.openshift-image-registry.svc:5000/$(params.namespace)/camel-launcher:$(params.camel-launcher-version)
+        - name: DOCKERFILE
+          value: Dockerfile
+        - name: CONTEXT
+          value: .
+        - name: TLS_VERIFY
+          value: "false"
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+          subPath: camel-launcher-build
+
     - name: build-correlator
+      runAfter:
+        - build-camel-launcher-image
       taskSpec:
         params:
           - name: repo-url
@@ -35,7 +79,7 @@ spec:
             type: string
           - name: namespace
             type: string
-          - name: camel-image
+          - name: camel-launcher-version
             type: string
           - name: runtime-version
             type: string
@@ -69,8 +113,8 @@ spec:
                     value: "${APP_NAME}"
                   - name: namespace
                     value: "$(params.namespace)"
-                  - name: camel-image
-                    value: "$(params.camel-image)"
+                  - name: camel-launcher-version
+                    value: "$(params.camel-launcher-version)"
                   - name: gav
                     value: "${GAV}"
                   - name: runtime-version
@@ -109,12 +153,14 @@ spec:
           value: $(params.repo-revision)
         - name: namespace
           value: $(params.namespace)
-        - name: camel-image
-          value: $(params.camel-image)
+        - name: camel-launcher-version
+          value: $(params.camel-launcher-version)
         - name: runtime-version
           value: $(params.runtime-version)
 
     - name: build-analyzer
+      runAfter:
+        - build-camel-launcher-image
       taskSpec:
         params:
           - name: repo-url
@@ -123,7 +169,7 @@ spec:
             type: string
           - name: namespace
             type: string
-          - name: camel-image
+          - name: camel-launcher-version
             type: string
           - name: runtime-version
             type: string
@@ -157,8 +203,8 @@ spec:
                     value: "${APP_NAME}"
                   - name: namespace
                     value: "$(params.namespace)"
-                  - name: camel-image
-                    value: "$(params.camel-image)"
+                  - name: camel-launcher-version
+                    value: "$(params.camel-launcher-version)"
                   - name: gav
                     value: "${GAV}"
                   - name: runtime-version
@@ -197,12 +243,14 @@ spec:
           value: $(params.repo-revision)
         - name: namespace
           value: $(params.namespace)
-        - name: camel-image
-          value: $(params.camel-image)
+        - name: camel-launcher-version
+          value: $(params.camel-launcher-version)
         - name: runtime-version
           value: $(params.runtime-version)
 
     - name: build-ui-console
+      runAfter:
+        - build-camel-launcher-image
       taskSpec:
         params:
           - name: repo-url
@@ -211,7 +259,7 @@ spec:
             type: string
           - name: namespace
             type: string
-          - name: camel-image
+          - name: camel-launcher-version
             type: string
           - name: runtime-version
             type: string
@@ -245,8 +293,8 @@ spec:
                     value: "${APP_NAME}"
                   - name: namespace
                     value: "$(params.namespace)"
-                  - name: camel-image
-                    value: "$(params.camel-image)"
+                  - name: camel-launcher-version
+                    value: "$(params.camel-launcher-version)"
                   - name: gav
                     value: "${GAV}"
                   - name: runtime-version
@@ -285,7 +333,7 @@ spec:
           value: $(params.repo-revision)
         - name: namespace
           value: $(params.namespace)
-        - name: camel-image
-          value: $(params.camel-image)
+        - name: camel-launcher-version
+          value: $(params.camel-launcher-version)
         - name: runtime-version
           value: $(params.runtime-version)

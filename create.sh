@@ -116,10 +116,21 @@ oc apply -f deploy/pipeline/
 # Step 12: Build application images
 echo ""
 echo "--- Building application images ---"
+WORKSPACE_TEMPLATE=$(mktemp --suffix=.yaml)
+cat > "${WORKSPACE_TEMPLATE}" <<'EOF'
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+EOF
 tkn pipeline start build-apps \
   -p namespace="${NS}" \
   --use-param-defaults \
+  -w name=shared-workspace,volumeClaimTemplateFile="${WORKSPACE_TEMPLATE}" \
   --showlog
+rm -f "${WORKSPACE_TEMPLATE}"
 
 # Step 13: Wait for all deployments to be ready
 echo ""

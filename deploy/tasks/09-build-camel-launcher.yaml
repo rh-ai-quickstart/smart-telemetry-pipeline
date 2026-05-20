@@ -1,0 +1,60 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: build-camel-launcher
+spec:
+  params:
+    - name: camel-launcher-version
+      type: string
+      description: Camel version for the launcher JAR
+      default: "4.20.0"
+  workspaces:
+    - name: source
+  steps:
+    - name: prepare-build-context
+      image: registry.access.redhat.com/ubi9/openjdk-21:latest
+      workingDir: $(workspaces.source.path)
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        VERSION="$(params.camel-launcher-version)"
+        BUILD_DIR="camel-launcher-build"
+
+        mkdir -p "${BUILD_DIR}"
+
+        echo "Downloading camel-launcher-${VERSION}.jar via Maven dependency:copy..."
+        mvn dependency:copy \
+          -Dartifact=org.apache.camel:camel-launcher:${VERSION}:jar \
+          -DoutputDirectory="${BUILD_DIR}" \
+          -Dmdep.stripVersion=false
+
+        cat > "${BUILD_DIR}/run.sh" << 'RUNEOF'
+        #!/bin/sh
+        exec java $JAVA_OPTS -jar "$CAMEL_HOME/bin/camel-launcher.jar" "$@"
+        RUNEOF
+
+        cat > "${BUILD_DIR}/Dockerfile" << DEOF
+        FROM registry.access.redhat.com/ubi9/openjdk-21:latest
+
+        ENV CAMEL_VERSION=${VERSION}
+        ENV CAMEL_HOME=/opt/camel
+        RUN mkdir -p \$CAMEL_HOME/bin && chown -R 185:0 \$CAMEL_HOME
+
+        ENV PATH="\$PATH:\$CAMEL_HOME/bin"
+
+        USER 185
+
+        COPY --chown=185:0 camel-launcher-${VERSION}.jar \$CAMEL_HOME/bin/camel-launcher.jar
+        COPY --chown=185:0 run.sh \$CAMEL_HOME/bin/camel
+
+        RUN chmod +x \$CAMEL_HOME/bin/camel && \
+            camel version
+
+        ENTRYPOINT ["camel"]
+        DEOF
+
+        echo "Build context ready in ${BUILD_DIR}/"
+        ls -la "${BUILD_DIR}/"
+      securityContext:
+        runAsUser: 0

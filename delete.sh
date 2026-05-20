@@ -19,14 +19,14 @@ oc delete -f deploy/resources/amq-broker/artemis-sandbox.yaml --ignore-not-found
 
 echo ""
 echo "--- Deleting pipeline resources ---"
-oc delete pipelinerun --all 2>/dev/null || true
-oc delete taskrun --all 2>/dev/null || true
-oc delete pipeline --all 2>/dev/null || true
-oc delete task --all 2>/dev/null || true
+oc delete pipelinerun.tekton.dev --all 2>/dev/null || true
+oc delete taskrun.tekton.dev --all 2>/dev/null || true
+oc delete pipeline.tekton.dev --all 2>/dev/null || true
+oc delete task.tekton.dev --all 2>/dev/null || true
 
 echo ""
 echo "--- Deleting built image streams ---"
-oc delete is correlator analyzer ui-console --ignore-not-found 2>/dev/null || true
+oc delete is correlator analyzer ui-console camel-launcher --ignore-not-found 2>/dev/null || true
 
 echo ""
 echo "--- Deleting ConfigMaps and Secrets ---"

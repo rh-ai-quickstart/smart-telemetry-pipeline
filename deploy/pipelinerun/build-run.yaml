@@ -16,8 +16,8 @@ spec:
       value: correlator
     - name: namespace
       value: slog-analyzer
-    - name: camel-image
-      value: "quay.io/mcarlett/camel-launcher:4.20.0"
+    - name: camel-launcher-version
+      value: "4.20.0"
     - name: gav
       value: "com.example:correlator:1.0.0"
   workspaces:

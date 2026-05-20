@@ -50,10 +50,16 @@ oc apply -f deploy/resources/infinispan/infinispan-sandbox.yaml
 oc wait deployment/infinispan --for=condition=Available --timeout=180s
 ```
 
-Create the caches:
+Create the caches (wait for the REST API to be ready first — it may take a few seconds after the pod starts):
 
 ```bash
 ISPN_POD=$(oc get pod -l app=infinispan -o jsonpath='{.items[0].metadata.name}')
+
+# Wait for Infinispan REST API
+until oc exec "${ISPN_POD}" -- curl -sf -u admin:password --digest \
+  http://localhost:11222/rest/v2/cache-managers/default/health/status 2>/dev/null; do
+  sleep 3
+done
 
 for CACHE_FILE in deploy/resources/infinispan/caches/*.json; do
   CACHE_NAME=$(basename "${CACHE_FILE}" .json)
@@ -174,13 +180,23 @@ oc apply -f deploy/pipeline/
 Build all three components (correlator, analyzer, ui-console) with a single pipeline:
 
 ```bash
+cat > /tmp/workspace-template.yaml <<'EOF'
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+EOF
+
 tkn pipeline start build-apps \
   -p namespace="${NS}" \
   --use-param-defaults \
+  -w name=shared-workspace,volumeClaimTemplateFile=/tmp/workspace-template.yaml \
   --showlog
 ```
 
-The `build-apps` pipeline starts three parallel `build` pipeline runs (one per component) and waits for all of them to complete. Use `--showlog` to follow the progress in real time.
+The `build-apps` pipeline first builds the `camel-launcher` image internally (downloading the JAR from Maven Central), then starts three parallel `build` pipeline runs (one per component) and waits for all of them to complete. The `shared-workspace` provides a PVC for the camel-launcher build step. Use `--showlog` to follow the progress in real time.
 
 > **Note:** The `namespace` parameter must match your sandbox namespace so that images are pushed to the correct ImageStream.
 
@@ -189,7 +205,7 @@ Once the images are pushed to the internal registry, the `image.openshift.io/tri
 Optionally, clean up completed pipeline and task runs to free resources (the sandbox has a limit of 30 ReplicaSets):
 
 ```bash
-oc delete pipelinerun --all
-oc delete taskrun --all
+oc delete pipelinerun.tekton.dev --all
+oc delete taskrun.tekton.dev --all
 oc get rs --no-headers | awk '$2==0 && $3==0 && $4==0 {print $1}' | xargs -r oc delete rs
 ```

@@ -24,10 +24,10 @@ spec:
       type: string
       description: Target namespace for the container image
       default: slog-analyzer
-    - name: camel-image
+    - name: camel-launcher-version
       type: string
-      description: Image containing the Camel CLI for export
-      default: "quay.io/mcarlett/camel-launcher:4.20.0"
+      description: Camel launcher version (image tag for the internally-built camel-launcher)
+      default: "4.20.0"
     - name: gav
       type: string
       description: Maven groupId:artifactId:version for the exported project
@@ -54,7 +54,7 @@ spec:
         - name: source
           workspace: shared-workspace
 
-    # Step 1: Clone the repository
+    # Step 2: Clone the repository
     - name: git-clone
       runAfter:
         - init-workspace
@@ -100,7 +100,7 @@ spec:
         - name: app-path
           value: repo/$(params.app-path)
         - name: camel-image
-          value: $(params.camel-image)
+          value: image-registry.openshift-image-registry.svc:5000/$(params.namespace)/camel-launcher:$(params.camel-launcher-version)
         - name: gav
           value: $(params.gav)
         - name: runtime-version

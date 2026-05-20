@@ -9,7 +9,7 @@ spec:
       description: Path within the repository to the Camel application to export
     - name: camel-image
       type: string
-      default: "quay.io/mcarlett/camel-launcher:4.20.0"
+      default: "camel-launcher:latest"
       description: Image containing the Camel CLI
     - name: gav
       type: string
