@@ -22,6 +22,8 @@ metadata:
   name: artemis
   labels:
     app: artemis
+    app.kubernetes.io/part-of: smart-log-analyzer
+    app.openshift.io/runtime: amq
 spec:
   replicas: 1
   selector:

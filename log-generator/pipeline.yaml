@@ -227,6 +227,10 @@ spec:
               --replicas=0 \
               -n "${NS}" --dry-run=client -o yaml | oc apply -f -
 
+            oc label deployment/${APP} -n "${NS}" \
+              app.kubernetes.io/part-of=log-generator \
+              app.openshift.io/runtime=camel --overwrite
+
             oc set env deployment/${APP} -n "${NS}" \
               OTEL_EXPORTER_OTLP_ENDPOINT="${OTEL_ENDPOINT}" \
               OTEL_EXPORTER_OTLP_PROTOCOL=grpc

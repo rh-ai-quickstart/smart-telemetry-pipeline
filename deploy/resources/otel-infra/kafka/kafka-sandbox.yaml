@@ -18,6 +18,7 @@ metadata:
   name: kafka
   labels:
     app: kafka
+    app.kubernetes.io/part-of: smart-log-analyzer
 spec:
   replicas: 1
   selector:

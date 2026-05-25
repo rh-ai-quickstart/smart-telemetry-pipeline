@@ -18,6 +18,8 @@ metadata:
   name: infinispan
   labels:
     app: infinispan
+    app.kubernetes.io/part-of: smart-log-analyzer
+    app.openshift.io/runtime: infinispan
 spec:
   replicas: 1
   selector:

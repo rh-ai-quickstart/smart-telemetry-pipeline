@@ -9,6 +9,7 @@ metadata:
     app: {{ $name }}
     app.kubernetes.io/name: {{ $name }}
     app.kubernetes.io/part-of: smart-log-analyzer
+    app.openshift.io/runtime: camel
     camel.apache.org/app: {{ $name }}
   annotations:
     image.openshift.io/triggers: >-
