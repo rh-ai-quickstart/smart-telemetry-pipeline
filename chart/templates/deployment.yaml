@@ -55,6 +55,24 @@ spec:
           resources:
             limits:
               memory: {{ $component.memoryLimit }}
+          startupProbe:
+            httpGet:
+              path: /observe/health/started
+              port: 9876
+            failureThreshold: 30
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /observe/health/live
+              port: 9876
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /observe/health/ready
+              port: 9876
+            periodSeconds: 10
+            failureThreshold: 3
           envFrom:
             - configMapRef:
                 name: infra-endpoints
