@@ -10,9 +10,9 @@ spec:
     - name: otel-collector-endpoint
       type: string
       default: "http://camel-otel-collector-opentelemetry-collector.slog-analyzer.svc:4317"
-    - name: camel-image
+    - name: camel-launcher-version
       type: string
-      default: "quay.io/mcarlett/camel-launcher:4.20.0"
+      default: "4.20.0"
   workspaces:
     - name: shared-workspace
 
@@ -145,7 +145,7 @@ spec:
 
               # Dockerfile
               cat > "${BUILD}/Dockerfile" << DOCKERFILE
-              FROM $(params.camel-image)
+              FROM image-registry.openshift-image-registry.svc:5000/$(params.namespace)/camel-launcher:$(params.camel-launcher-version)
 
               USER root
 
