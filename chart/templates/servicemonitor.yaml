@@ -1,0 +1,20 @@
+{{- range $name, $component := .Values.components }}
+{{- if $component.enabled }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ $name }}
+  labels:
+    app: {{ $name }}
+    app.kubernetes.io/part-of: smart-log-analyzer
+spec:
+  selector:
+    matchLabels:
+      app: {{ $name }}
+  endpoints:
+    - port: management
+      path: /observe/metrics
+      interval: 30s
+{{- end }}
+{{- end }}

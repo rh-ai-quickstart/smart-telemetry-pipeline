@@ -8,6 +8,7 @@ This guide covers the step-by-step manual deployment of the Smart Telemetry Pipe
 2. [Configure OpenAI Credentials](#configure-openai-credentials)
 3. [Deploy Applications with Helm](#deploy-applications-with-helm)
 4. [Build Application Images](#build-application-images)
+5. [Delete](#delete)
 
 ## Deploy the Infrastructure
 
@@ -208,4 +209,38 @@ Optionally, clean up completed pipeline and task runs to free resources (the san
 oc delete pipelinerun.tekton.dev --all
 oc delete taskrun.tekton.dev --all
 oc get rs --no-headers | awk '$2==0 && $3==0 && $4==0 {print $1}' | xargs -r oc delete rs
+```
+
+## Delete
+
+To remove everything:
+
+```bash
+# Uninstall the Helm release
+helm uninstall smart-log-analyzer
+
+# Delete infrastructure
+helm uninstall camel-otel-collector --ignore-not-found
+oc delete -f deploy/resources/otel-infra/kafka/kafka-sandbox.yaml --ignore-not-found
+oc delete -f deploy/resources/infinispan/infinispan-sandbox.yaml --ignore-not-found
+oc delete -f deploy/resources/amq-broker/artemis-sandbox.yaml --ignore-not-found
+
+# Delete all pipeline resources
+oc delete pipelinerun --all
+oc delete taskrun --all
+oc delete pipeline --all
+oc delete task --all
+
+# Delete built image streams
+oc delete is correlator analyzer ui-console camel-launcher --ignore-not-found
+
+# Delete remaining resources
+oc delete configmap infra-endpoints otel-infra-endpoints base-image-config-quarkus service-ca-bundle --ignore-not-found
+oc delete secret infra-accounts openai service-ca-truststore --ignore-not-found
+```
+
+Or use the cleanup script:
+
+```bash
+./delete.sh
 ```
