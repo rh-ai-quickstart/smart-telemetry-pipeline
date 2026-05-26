@@ -34,8 +34,6 @@ spec:
     - name: export
       image: $(params.camel-image)
       workingDir: $(workspaces.source.path)/$(params.app-path)
-      securityContext:
-        runAsUser: 0
       script: |
         #!/usr/bin/env bash
         set -euo pipefail
@@ -50,6 +48,7 @@ spec:
         VERSION="$(params.runtime-version)"
         if [ -n "${VERSION}" ]; then
           EXTRA_ARGS="--quarkus-version=${VERSION}"
+          export JAVA_OPTS="${JAVA_OPTS:-} -Dcamel.jbang.quarkusVersion=${VERSION}"
         fi
 
         DEP_ARGS=""
@@ -68,8 +67,6 @@ spec:
         cat "${EXPORT_DIR}/pom.xml"
     - name: fix-permissions
       image: registry.access.redhat.com/ubi9/ubi-minimal:latest
-      securityContext:
-        runAsUser: 0
       script: |
         #!/usr/bin/env bash
         chown -R 65532:0 $(workspaces.source.path)/$(params.export-dir)

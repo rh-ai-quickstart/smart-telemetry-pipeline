@@ -130,9 +130,10 @@ spec:
             script: |
               #!/usr/bin/env bash
               set -euo pipefail
-              ./mvnw clean package
-            securityContext:
-              runAsUser: 0
+              set +u
+              source /opt/jboss/container/maven/default/maven.sh && maven_init
+              set -u
+              ./mvnw clean package -Dcom.redhat.xpaas.repo.redhatga
 
     # Step 6: Write Dockerfile from ConfigMap to workspace
     - name: prepare-dockerfile

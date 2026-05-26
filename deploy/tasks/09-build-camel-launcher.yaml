@@ -23,11 +23,15 @@ spec:
 
         mkdir -p "${BUILD_DIR}"
 
+        set +u
+        source /opt/jboss/container/maven/default/maven.sh && maven_init
+        set -u
+
         echo "Downloading camel-launcher-${VERSION}.jar via Maven dependency:copy..."
         mvn dependency:copy \
           -Dartifact=org.apache.camel:camel-launcher:${VERSION}:jar \
           -DoutputDirectory="${BUILD_DIR}" \
-          -Dmdep.stripVersion=false
+          -Dcom.redhat.xpaas.repo.redhatga
 
         cat > "${BUILD_DIR}/run.sh" << 'RUNEOF'
         #!/bin/sh
@@ -56,5 +60,3 @@ spec:
 
         echo "Build context ready in ${BUILD_DIR}/"
         ls -la "${BUILD_DIR}/"
-      securityContext:
-        runAsUser: 0
