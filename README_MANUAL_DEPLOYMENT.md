@@ -6,8 +6,8 @@ This guide covers the step-by-step manual deployment of the Smart Telemetry Pipe
 
 1. [Deploy the Infrastructure](#deploy-the-infrastructure)
 2. [Configure OpenAI Credentials](#configure-openai-credentials)
-3. [Deploy Applications with Helm](#deploy-applications-with-helm)
-4. [Build Application Images](#build-application-images)
+3. [Build Application Images](#build-application-images)
+4. [Deploy Applications with Helm](#deploy-applications-with-helm)
 5. [Delete](#delete)
 
 ## Deploy the Infrastructure
@@ -151,24 +151,6 @@ oc create secret generic openai \
   --dry-run=client -o yaml | oc apply -f -
 ```
 
-## Deploy Applications with Helm
-
-Deploy the Helm chart:
-
-```bash
-helm install smart-log-analyzer chart/ \
-  --set namespace="${NS}" \
-  -n "${NS}"
-```
-
-To upgrade after changes:
-
-```bash
-helm upgrade smart-log-analyzer chart/ \
-  --set namespace="${NS}" \
-  -n "${NS}"
-```
-
 ## Build Application Images
 
 Apply the Tekton tasks and pipeline:
@@ -201,14 +183,30 @@ The `build-apps` pipeline first builds the `camel-launcher` image internally (do
 
 > **Note:** The `namespace` parameter must match your sandbox namespace so that images are pushed to the correct ImageStream.
 
-Once the images are pushed to the internal registry, the `image.openshift.io/triggers` annotation on the Deployments will automatically trigger a rollout.
-
 Optionally, clean up completed pipeline and task runs to free resources (the sandbox has a limit of 30 ReplicaSets):
 
 ```bash
 oc delete pipelinerun.tekton.dev --all
 oc delete taskrun.tekton.dev --all
 oc get rs --no-headers | awk '$2==0 && $3==0 && $4==0 {print $1}' | xargs -r oc delete rs
+```
+
+## Deploy Applications with Helm
+
+Deploy the Helm chart (the application images must be built before this step):
+
+```bash
+helm install smart-log-analyzer chart/ \
+  --set namespace="${NS}" \
+  -n "${NS}"
+```
+
+To upgrade after changes:
+
+```bash
+helm upgrade smart-log-analyzer chart/ \
+  --set namespace="${NS}" \
+  -n "${NS}"
 ```
 
 ## Delete

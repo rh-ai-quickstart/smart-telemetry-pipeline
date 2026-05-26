@@ -219,7 +219,7 @@ cd smart-telemetry-pipeline
 Two scripts automate the full installation and cleanup.
 
 ```bash
-# Install everything (infrastructure, applications, build images)
+# Install everything (infrastructure, build images, applications)
 ./create.sh
 
 # Remove everything

@@ -100,20 +100,13 @@ oc create configmap service-ca-bundle --dry-run=client -o yaml | oc apply -f -
 oc annotate configmap service-ca-bundle service.beta.openshift.io/inject-cabundle=true --overwrite
 echo "Service CA bundle configured"
 
-# Step 10: Deploy applications with Helm
-echo ""
-echo "--- Deploying applications with Helm ---"
-helm install smart-log-analyzer chart/ \
-  --set namespace="${NS}" \
-  -n "${NS}"
-
-# Step 11: Apply Tekton tasks and pipeline
+# Step 10: Apply Tekton tasks and pipeline
 echo ""
 echo "--- Applying Tekton tasks and pipeline ---"
 oc apply -f deploy/tasks/
 oc apply -f deploy/pipeline/
 
-# Step 12: Build application images
+# Step 11: Build application images
 echo ""
 echo "--- Building application images ---"
 WORKSPACE_TEMPLATE=$(mktemp --suffix=.yaml)
@@ -131,6 +124,13 @@ tkn pipeline start build-apps \
   -w name=shared-workspace,volumeClaimTemplateFile="${WORKSPACE_TEMPLATE}" \
   --showlog
 rm -f "${WORKSPACE_TEMPLATE}"
+
+# Step 12: Deploy applications with Helm
+echo ""
+echo "--- Deploying applications with Helm ---"
+helm install smart-log-analyzer chart/ \
+  --set namespace="${NS}" \
+  -n "${NS}"
 
 # Step 13: Wait for all deployments to be ready
 echo ""
