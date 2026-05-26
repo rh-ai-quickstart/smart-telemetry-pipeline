@@ -7,11 +7,11 @@ spec:
     name: build
   params:
     - name: repo-url
-      value: https://github.com/loop9x/smart-log-analyzer.git
+      value: https://github.com/apache/camel-jbang-examples.git
     - name: repo-revision
       value: main
     - name: app-path
-      value: correlator
+      value: smart-log-analyzer/correlator
     - name: app-name
       value: correlator
     - name: namespace
