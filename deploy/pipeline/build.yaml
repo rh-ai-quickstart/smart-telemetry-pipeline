@@ -125,14 +125,11 @@ spec:
           - name: source
         steps:
           - name: maven-goals
-            image: registry.access.redhat.com/ubi9/openjdk-21:latest
+            image: registry.access.redhat.com/ubi10/openjdk-21:latest
             workingDir: $(workspaces.source.path)/export
             script: |
               #!/usr/bin/env bash
               set -euo pipefail
-              set +u
-              source /opt/jboss/container/maven/default/maven.sh && maven_init
-              set -u
               ./mvnw clean package -Dcom.redhat.xpaas.repo.redhatga
 
     # Step 6: Write Dockerfile from ConfigMap to workspace

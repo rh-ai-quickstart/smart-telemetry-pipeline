@@ -22,7 +22,7 @@ The scripts must be run from the repository root directory.
 |---|---|---|
 | `namespace` | `slog-analyzer` | Target namespace for the image and deployment |
 | `otel-collector-endpoint` | `http://camel-otel-collector-opentelemetry-collector.slog-analyzer.svc:4317` | OTLP collector endpoint |
-| `camel-image` | `quay.io/mcarlett/camel-launcher:4.20.0` | Base image for the Camel JBang runtime |
+| `camel-launcher-version` | `4.20.0` | Tag of the internally-built `camel-launcher` image from the OpenShift registry |
 
 The `run.sh` script automatically detects the current namespace and adjusts the OTel Collector endpoint accordingly.
 

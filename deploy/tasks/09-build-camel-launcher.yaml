@@ -12,7 +12,7 @@ spec:
     - name: source
   steps:
     - name: prepare-build-context
-      image: registry.access.redhat.com/ubi9/openjdk-21:latest
+      image: registry.access.redhat.com/ubi10/openjdk-21:latest
       workingDir: $(workspaces.source.path)
       script: |
         #!/usr/bin/env bash
@@ -22,10 +22,6 @@ spec:
         BUILD_DIR="camel-launcher-build"
 
         mkdir -p "${BUILD_DIR}"
-
-        set +u
-        source /opt/jboss/container/maven/default/maven.sh && maven_init
-        set -u
 
         echo "Downloading camel-launcher-${VERSION}.jar via Maven dependency:copy..."
         mvn dependency:copy \
@@ -39,15 +35,16 @@ spec:
         RUNEOF
 
         cat > "${BUILD_DIR}/Dockerfile" << DEOF
-        FROM registry.access.redhat.com/ubi9/openjdk-21:latest
+        FROM registry.access.redhat.com/ubi10/openjdk-21:latest
 
         ENV CAMEL_VERSION=${VERSION}
         ENV CAMEL_HOME=/opt/camel
+
+        USER root
         RUN mkdir -p \$CAMEL_HOME/bin && chown -R 185:0 \$CAMEL_HOME
+        USER 185
 
         ENV PATH="\$PATH:\$CAMEL_HOME/bin"
-
-        USER 185
 
         COPY --chown=185:0 camel-launcher-${VERSION}.jar \$CAMEL_HOME/bin/camel-launcher.jar
         COPY --chown=185:0 run.sh \$CAMEL_HOME/bin/camel

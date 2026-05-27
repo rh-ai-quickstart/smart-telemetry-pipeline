@@ -66,7 +66,7 @@ spec:
         echo "Generated pom.xml:"
         cat "${EXPORT_DIR}/pom.xml"
     - name: fix-permissions
-      image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+      image: registry.access.redhat.com/ubi10/ubi-minimal:latest
       script: |
         #!/usr/bin/env bash
         chown -R 65532:0 $(workspaces.source.path)/$(params.export-dir)

@@ -179,7 +179,7 @@ tkn pipeline start build-apps \
   --showlog
 ```
 
-The `build-apps` pipeline first builds the `camel-launcher` image internally (downloading the JAR from Maven Central), then starts three parallel `build` pipeline runs (one per component) and waits for all of them to complete. The `shared-workspace` provides a PVC for the camel-launcher build step. Use `--showlog` to follow the progress in real time.
+The `build-apps` pipeline first builds the `camel-launcher` image internally (downloading the JAR from Maven Central or Red Hat GA repository), then starts three parallel `build` pipeline runs (one per component) and waits for all of them to complete. The `shared-workspace` provides a PVC for the camel-launcher build step. Use `--showlog` to follow the progress in real time.
 
 > **Note:** The `namespace` parameter must match your sandbox namespace so that images are pushed to the correct ImageStream.
 

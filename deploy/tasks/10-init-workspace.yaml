@@ -8,7 +8,7 @@ spec:
       description: Workspace to initialize
   steps:
     - name: fix-permissions
-      image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+      image: registry.access.redhat.com/ubi10/ubi-minimal:latest
       securityContext:
         runAsUser: 0
       script: |

@@ -105,7 +105,7 @@ graph LR
     REG -- "image trigger" --> DEP[Deployment<br/>rollout]
 ```
 
-The **Build Camel Launcher** step downloads the `camel-launcher` JAR from Maven Central (via `mvn dependency:copy`) and builds it into a container image pushed to the OpenShift internal registry. The version is configurable via the `camel-launcher-version` pipeline parameter (default: `4.20.0`). The **Camel Export** step runs `camel export --runtime=quarkus` using the internally-built camel-launcher image to convert the Camel JBang application into a standard Quarkus Maven project. The **Maven Build** step compiles it into a Quarkus fast-jar. The **Build Image** step uses Buildah to create the container image and push it to the OpenShift internal registry. The `image.openshift.io/triggers` annotation on the Deployment automatically triggers a rollout when a new image is pushed.
+The **Build Camel Launcher** step downloads the `camel-launcher` JAR from Maven Central (via `mvn dependency:copy`) and builds it into a container image pushed to the OpenShift internal registry. The version is configurable via the `camel-launcher-version` pipeline parameter. The **Camel Export** step runs `camel export --runtime=quarkus` using the internally-built camel-launcher image to convert the Camel JBang application into a standard Quarkus Maven project. The **Maven Build** step compiles it into a Quarkus fast-jar. The **Build Image** step uses Buildah to create the container image and push it to the OpenShift internal registry. The `image.openshift.io/triggers` annotation on the Deployment automatically triggers a rollout when a new image is pushed.
 
 ## Requirements
 
