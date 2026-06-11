@@ -1,13 +1,15 @@
+# Correlator
 
-```
-camel run traces-mapper.camel.yaml logs-mapper.camel.yaml infinispan.camel.yaml kaoto-datamapper-*
+Consumes OpenTelemetry logs and traces from Kafka topics (`otlp_logs`, `otlp_spans`), correlates them by traceId in Infinispan, and detects errors. When cached events expire (after a configurable TTL), the traceId is forwarded to a JMS queue for analysis by the analyzer.
+
+## Running Locally
+
+```bash
+camel run *.camel.yaml *.xsl *.json --dev --prop=application-dev.properties
 ```
 
-```
-camel export --runtime=quarkus --directory=./quarkus traces-mapper.camel.yaml logs-mapper.camel.yaml infinispan.camel.yaml kaoto-datamapper-*
-```
+## Exporting
 
-```
-camel export --runtime=spring-boot --directory=./springboot traces-mapper.camel.yaml logs-mapper.camel.yaml infinispan.camel.yaml kaoto-datamapper-*
-camel kubernetes export --runtime=spring-boot --directory=./springboot traces-mapper.camel.yaml logs-mapper.camel.yaml infinispan.camel.yaml kaoto-datamapper-*
+```bash
+camel export --runtime=quarkus --directory=./quarkus *.camel.yaml *.xsl *.json
 ```

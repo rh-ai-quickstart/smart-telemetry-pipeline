@@ -4,20 +4,20 @@ An intelligent observability pipeline that automatically detects microservice er
 
 ## Table of contents
 
-1. [Architecture](#architecture)
-2. [Build Pipeline](#build-pipeline)
-3. [Requirements](#requirements)
-4. [Get Access to the Developer Sandbox](#get-access-to-the-developer-sandbox)
-5. [Install the CLI Tools](#install-the-cli-tools)
-6. [Log In to the Cluster](#log-in-to-the-cluster)
-7. [Clone This Repository](#clone-this-repository)
-8. [Quick Start](#quick-start)
-9. [Verify the Installation](#verify-the-installation)
-10. [Monitoring and Alerting](#monitoring-and-alerting)
-11. [Troubleshooting](#troubleshooting)
-12. [Delete](#delete)
+1. [Detailed Description](#detailed-description)
+2. [Requirements](#requirements)
+3. [Get Access to the Developer Sandbox](#get-access-to-the-developer-sandbox)
+4. [Install the CLI Tools](#install-the-cli-tools)
+5. [Log In to the Cluster](#log-in-to-the-cluster)
+6. [Clone This Repository](#clone-this-repository)
+7. [Quick Start](#quick-start)
+8. [Verify the Installation](#verify-the-installation)
+9. [Monitoring and Alerting](#monitoring-and-alerting)
+10. [Troubleshooting](#troubleshooting)
+11. [Delete](#delete)
+12. [References](#references)
 
-## Detailed description
+## Detailed Description
 
 The system consists of three Apache Camel applications that form an automated error analysis pipeline:
 
