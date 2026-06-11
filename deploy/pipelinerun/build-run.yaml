@@ -17,7 +17,7 @@ spec:
     - name: namespace
       value: slog-analyzer
     - name: camel-launcher-version
-      value: "4.20.0"
+      value: "4.18.1.redhat-00016"
     - name: gav
       value: "com.example:correlator:1.0.0"
   workspaces:

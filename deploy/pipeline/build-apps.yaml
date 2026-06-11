@@ -19,11 +19,11 @@ spec:
     - name: camel-launcher-version
       type: string
       description: Camel version for the launcher image
-      default: "4.20.0"
+      default: "4.18.1.redhat-00016"
     - name: runtime-version
       type: string
       description: "Quarkus version. If empty, uses the default from camel export"
-      default: ""
+      default: "3.33.2.redhat-00002"
 
   workspaces:
     - name: shared-workspace

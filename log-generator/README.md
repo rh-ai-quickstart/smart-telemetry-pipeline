@@ -22,7 +22,8 @@ The scripts must be run from the repository root directory.
 |---|---|---|
 | `namespace` | `slog-analyzer` | Target namespace for the image and deployment |
 | `otel-collector-endpoint` | `http://camel-otel-collector-opentelemetry-collector.slog-analyzer.svc:4317` | OTLP collector endpoint |
-| `camel-launcher-version` | `4.20.0` | Tag of the internally-built `camel-launcher` image from the OpenShift registry |
+| `camel-launcher-version` | `4.18.1.redhat-00016` | Tag of the internally-built `camel-launcher` image from the OpenShift registry |
+| `camel-image` | _(built from namespace + camel-launcher-version)_ | Base camel-launcher image for the log-generator Dockerfile. Override to use an existing image from a different registry |
 
 The `run.sh` script automatically detects the current namespace and adjusts the OTel Collector endpoint accordingly.
 

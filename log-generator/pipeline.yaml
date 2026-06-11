@@ -12,7 +12,11 @@ spec:
       default: "http://camel-otel-collector-opentelemetry-collector.slog-analyzer.svc:4317"
     - name: camel-launcher-version
       type: string
-      default: "4.20.0"
+      default: "4.18.1.redhat-00016"
+    - name: camel-image
+      type: string
+      description: "Base camel-launcher image for the log-generator Dockerfile"
+      default: ""
   workspaces:
     - name: shared-workspace
 
@@ -30,6 +34,9 @@ spec:
       workspaces:
         - name: source
           workspace: shared-workspace
+      params:
+        - name: camel-image
+          value: $(params.camel-image)
       taskSpec:
         params:
           - name: camel-image
@@ -144,8 +151,12 @@ spec:
               AGENT
 
               # Dockerfile
+              CAMEL_IMAGE="$(params.camel-image)"
+              if [ -z "${CAMEL_IMAGE}" ]; then
+                CAMEL_IMAGE="image-registry.openshift-image-registry.svc:5000/$(params.namespace)/camel-launcher:$(params.camel-launcher-version)"
+              fi
               cat > "${BUILD}/Dockerfile" << DOCKERFILE
-              FROM image-registry.openshift-image-registry.svc:5000/$(params.namespace)/camel-launcher:$(params.camel-launcher-version)
+              FROM ${CAMEL_IMAGE}
 
               USER root
 
@@ -169,10 +180,6 @@ spec:
 
               echo "Build context ready:"
               ls -la "${BUILD}"
-      params:
-        - name: camel-image
-          value: $(params.camel-image)
-
     - name: build-image
       runAfter:
         - prepare-sources
