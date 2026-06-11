@@ -269,7 +269,7 @@ If you prefer to run each step manually, see the [Manual Deployment Guide](READM
 
 The Helm chart deploys **ServiceMonitors** and a **PrometheusRule** that integrate with the OpenShift user-workload monitoring stack. All three Camel applications expose Prometheus metrics on port 9876 at `/observe/metrics`, which are scraped automatically.
 
-> **Prerequisite:** User-workload monitoring must be enabled on the cluster. On clusters with `cluster-admin` access, enable it by setting `enableUserWorkload: true` in the `cluster-monitoring-config` ConfigMap in the `openshift-monitoring` namespace ([documentation](https://docs.redhat.com/en/documentation/openshift_container_platform/4.18/html/monitoring/configuring-user-defined-workload-monitoring)). On the Developer Sandbox, user-workload monitoring may not be available — in that case, use the built-in **Infrastructure** dashboard in the UI Console application, which polls the same Prometheus metrics directly from the services.
+> **Prerequisite:** User-workload monitoring must be enabled on the cluster. On clusters with `cluster-admin` access, enable it by setting `enableUserWorkload: true` in the `cluster-monitoring-config` ConfigMap in the `openshift-monitoring` namespace ([documentation](https://docs.redhat.com/en/documentation/monitoring_stack_for_red_hat_openshift/latest/html/configuring_user_workload_monitoring/index)). On the Developer Sandbox, user-workload monitoring may not be available — in that case, use the built-in **Infrastructure** dashboard in the UI Console application, which polls the same Prometheus metrics directly from the services.
 
 ### Viewing metrics in the OpenShift console
 
