@@ -1,0 +1,57 @@
+# Analyzer status API (real-time processing state)
+- rest:
+    description: Status API REST
+    path: /api/analyzer
+    get:
+      - id: get-analyzer-state
+        description: Get analyzer state
+        path: /state
+        produces: application/json
+        to: direct:get-analyzer-state
+
+- route:
+    id: route-get-analyzer-state
+    description: Serve status API
+    from:
+      uri: direct:get-analyzer-state
+      steps:
+        - doTry:
+            description: Try read file
+            steps:
+              - pollEnrich:
+                  description: Read state file
+                  expression:
+                    simple: "file:/tmp/smart-log-analyzer?fileName=analyzer-state.json&noop=true&idempotent=false"
+                  timeout: 250
+              - choice:
+                  description: Check file content
+                  when:
+                    - simple: "${body} != null"
+                      steps:
+                        - convertBodyTo:
+                            description: Convert to String
+                            type: String
+                        - setHeader:
+                            description: Set JSON type
+                            name: Content-Type
+                            constant: application/json
+                  otherwise:
+                    steps:
+                      - setBody:
+                          description: Set default state
+                          constant: "{\"active\":false,\"traceId\":\"\",\"startedAtEpochMs\":0,\"updatedAtEpochMs\":0}"
+                      - setHeader:
+                          description: Set JSON type
+                          name: Content-Type
+                          constant: application/json
+            doCatch:
+              - exception:
+                  - java.lang.Exception
+                steps:
+                  - setBody:
+                      description: Set error state
+                      constant: "{\"active\":false,\"traceId\":\"\",\"startedAtEpochMs\":0,\"updatedAtEpochMs\":0}"
+                  - setHeader:
+                      description: Set JSON type
+                      name: Content-Type
+                      constant: application/json

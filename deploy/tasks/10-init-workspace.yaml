@@ -1,0 +1,20 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: init-workspace
+spec:
+  workspaces:
+    - name: source
+      description: Workspace to initialize
+  steps:
+    - name: fix-permissions
+      image: registry.access.redhat.com/ubi10/ubi-minimal:latest
+      securityContext:
+        runAsUser: 0
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+        echo "Fixing workspace permissions..."
+        chmod -R 777 $(workspaces.source.path)
+        rm -rf $(workspaces.source.path)/lost+found
+        echo "Workspace ready."

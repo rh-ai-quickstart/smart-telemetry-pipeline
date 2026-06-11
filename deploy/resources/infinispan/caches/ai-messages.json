@@ -1,0 +1,11 @@
+{
+  "ai-messages": {
+    "distributed-cache": {
+      "mode": "SYNC",
+      "statistics": true,
+      "encoding": {
+        "media-type": "text/plain"
+      }
+    }
+  }
+}

@@ -1,0 +1,339 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: build-apps
+spec:
+  params:
+    - name: repo-url
+      type: string
+      description: Git repository URL
+      default: "https://github.com/mcarlett/smart-telemetry-pipeline.git"
+    - name: repo-revision
+      type: string
+      description: Git revision (branch, tag, or commit SHA)
+      default: main
+    - name: namespace
+      type: string
+      description: Target namespace for the container images
+      default: slog-analyzer
+    - name: camel-launcher-version
+      type: string
+      description: Camel version for the launcher image
+      default: "4.18.1.redhat-00016"
+    - name: runtime-version
+      type: string
+      description: "Quarkus version. If empty, uses the default from camel export"
+      default: "3.33.2.redhat-00002"
+
+  workspaces:
+    - name: shared-workspace
+      description: Workspace for building the camel-launcher image
+
+  tasks:
+    # Step 0a: Prepare camel-launcher build context
+    - name: build-camel-launcher
+      taskRef:
+        name: build-camel-launcher
+      params:
+        - name: camel-launcher-version
+          value: $(params.camel-launcher-version)
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+
+    # Step 0b: Build and push camel-launcher image
+    - name: build-camel-launcher-image
+      runAfter:
+        - build-camel-launcher
+      taskRef:
+        resolver: cluster
+        params:
+          - name: kind
+            value: task
+          - name: name
+            value: buildah
+          - name: namespace
+            value: openshift-pipelines
+      params:
+        - name: IMAGE
+          value: image-registry.openshift-image-registry.svc:5000/$(params.namespace)/camel-launcher:$(params.camel-launcher-version)
+        - name: DOCKERFILE
+          value: Dockerfile
+        - name: CONTEXT
+          value: .
+        - name: TLS_VERIFY
+          value: "false"
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+          subPath: camel-launcher-build
+
+    - name: build-correlator
+      runAfter:
+        - build-camel-launcher-image
+      taskSpec:
+        params:
+          - name: repo-url
+            type: string
+          - name: repo-revision
+            type: string
+          - name: namespace
+            type: string
+          - name: camel-launcher-version
+            type: string
+          - name: runtime-version
+            type: string
+        steps:
+          - name: start-and-wait
+            image: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest
+            script: |
+              #!/usr/bin/env bash
+              set -euo pipefail
+
+              APP_NAME="correlator"
+              GAV="com.example:correlator:1.0.0"
+              DEPS="camel-jms,camel-observability-services,mvn:org.apache.camel.quarkus:camel-quarkus-platform-http,mvn:org.apache.activemq:artemis-jakarta-client-all:2.44.0,mvn:io.quarkiverse.messaginghub:quarkus-pooled-jms:2.12.0"
+
+              RUN=$(cat <<EOF | oc create -f - -o jsonpath='{.metadata.name}'
+              apiVersion: tekton.dev/v1
+              kind: PipelineRun
+              metadata:
+                generateName: build-${APP_NAME}-
+              spec:
+                pipelineRef:
+                  name: build
+                params:
+                  - name: repo-url
+                    value: "$(params.repo-url)"
+                  - name: repo-revision
+                    value: "$(params.repo-revision)"
+                  - name: app-path
+                    value: "src/${APP_NAME}"
+                  - name: app-name
+                    value: "${APP_NAME}"
+                  - name: namespace
+                    value: "$(params.namespace)"
+                  - name: camel-launcher-version
+                    value: "$(params.camel-launcher-version)"
+                  - name: gav
+                    value: "${GAV}"
+                  - name: runtime-version
+                    value: "$(params.runtime-version)"
+                  - name: deps
+                    value: "${DEPS}"
+                workspaces:
+                  - name: shared-workspace
+                    volumeClaimTemplate:
+                      spec:
+                        accessModes:
+                          - ReadWriteOnce
+                        resources:
+                          requests:
+                            storage: 1Gi
+              EOF
+              )
+
+              echo "Started ${RUN}"
+              while true; do
+                STATUS=$(oc get pipelinerun "${RUN}" -o jsonpath='{.status.conditions[0].status}' 2>/dev/null || echo "Unknown")
+                REASON=$(oc get pipelinerun "${RUN}" -o jsonpath='{.status.conditions[0].reason}' 2>/dev/null || echo "")
+                if [ "${STATUS}" = "True" ]; then
+                  echo "${RUN}: Succeeded"
+                  exit 0
+                elif [ "${STATUS}" = "False" ]; then
+                  echo "${RUN}: Failed (${REASON})"
+                  exit 1
+                fi
+                sleep 10
+              done
+      params:
+        - name: repo-url
+          value: $(params.repo-url)
+        - name: repo-revision
+          value: $(params.repo-revision)
+        - name: namespace
+          value: $(params.namespace)
+        - name: camel-launcher-version
+          value: $(params.camel-launcher-version)
+        - name: runtime-version
+          value: $(params.runtime-version)
+
+    - name: build-analyzer
+      runAfter:
+        - build-camel-launcher-image
+      taskSpec:
+        params:
+          - name: repo-url
+            type: string
+          - name: repo-revision
+            type: string
+          - name: namespace
+            type: string
+          - name: camel-launcher-version
+            type: string
+          - name: runtime-version
+            type: string
+        steps:
+          - name: start-and-wait
+            image: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest
+            script: |
+              #!/usr/bin/env bash
+              set -euo pipefail
+
+              APP_NAME="analyzer"
+              GAV="com.example:analyzer:1.0.0"
+              DEPS="camel-jms,camel-observability-services,mvn:org.apache.camel.quarkus:camel-quarkus-platform-http,mvn:org.apache.activemq:artemis-jakarta-client-all:2.44.0,mvn:io.quarkiverse.messaginghub:quarkus-pooled-jms:2.12.0"
+
+              RUN=$(cat <<EOF | oc create -f - -o jsonpath='{.metadata.name}'
+              apiVersion: tekton.dev/v1
+              kind: PipelineRun
+              metadata:
+                generateName: build-${APP_NAME}-
+              spec:
+                pipelineRef:
+                  name: build
+                params:
+                  - name: repo-url
+                    value: "$(params.repo-url)"
+                  - name: repo-revision
+                    value: "$(params.repo-revision)"
+                  - name: app-path
+                    value: "src/${APP_NAME}"
+                  - name: app-name
+                    value: "${APP_NAME}"
+                  - name: namespace
+                    value: "$(params.namespace)"
+                  - name: camel-launcher-version
+                    value: "$(params.camel-launcher-version)"
+                  - name: gav
+                    value: "${GAV}"
+                  - name: runtime-version
+                    value: "$(params.runtime-version)"
+                  - name: deps
+                    value: "${DEPS}"
+                workspaces:
+                  - name: shared-workspace
+                    volumeClaimTemplate:
+                      spec:
+                        accessModes:
+                          - ReadWriteOnce
+                        resources:
+                          requests:
+                            storage: 1Gi
+              EOF
+              )
+
+              echo "Started ${RUN}"
+              while true; do
+                STATUS=$(oc get pipelinerun "${RUN}" -o jsonpath='{.status.conditions[0].status}' 2>/dev/null || echo "Unknown")
+                REASON=$(oc get pipelinerun "${RUN}" -o jsonpath='{.status.conditions[0].reason}' 2>/dev/null || echo "")
+                if [ "${STATUS}" = "True" ]; then
+                  echo "${RUN}: Succeeded"
+                  exit 0
+                elif [ "${STATUS}" = "False" ]; then
+                  echo "${RUN}: Failed (${REASON})"
+                  exit 1
+                fi
+                sleep 10
+              done
+      params:
+        - name: repo-url
+          value: $(params.repo-url)
+        - name: repo-revision
+          value: $(params.repo-revision)
+        - name: namespace
+          value: $(params.namespace)
+        - name: camel-launcher-version
+          value: $(params.camel-launcher-version)
+        - name: runtime-version
+          value: $(params.runtime-version)
+
+    - name: build-ui-console
+      runAfter:
+        - build-camel-launcher-image
+      taskSpec:
+        params:
+          - name: repo-url
+            type: string
+          - name: repo-revision
+            type: string
+          - name: namespace
+            type: string
+          - name: camel-launcher-version
+            type: string
+          - name: runtime-version
+            type: string
+        steps:
+          - name: start-and-wait
+            image: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest
+            script: |
+              #!/usr/bin/env bash
+              set -euo pipefail
+
+              APP_NAME="ui-console"
+              GAV="com.example:ui-console:1.0.0"
+              DEPS="camel-jms,camel-observability-services,mvn:org.apache.camel.quarkus:camel-quarkus-platform-http,mvn:org.apache.activemq:artemis-jakarta-client-all:2.44.0,mvn:io.quarkiverse.messaginghub:quarkus-pooled-jms:2.12.0"
+
+              RUN=$(cat <<EOF | oc create -f - -o jsonpath='{.metadata.name}'
+              apiVersion: tekton.dev/v1
+              kind: PipelineRun
+              metadata:
+                generateName: build-${APP_NAME}-
+              spec:
+                pipelineRef:
+                  name: build
+                params:
+                  - name: repo-url
+                    value: "$(params.repo-url)"
+                  - name: repo-revision
+                    value: "$(params.repo-revision)"
+                  - name: app-path
+                    value: "src/${APP_NAME}"
+                  - name: app-name
+                    value: "${APP_NAME}"
+                  - name: namespace
+                    value: "$(params.namespace)"
+                  - name: camel-launcher-version
+                    value: "$(params.camel-launcher-version)"
+                  - name: gav
+                    value: "${GAV}"
+                  - name: runtime-version
+                    value: "$(params.runtime-version)"
+                  - name: deps
+                    value: "${DEPS}"
+                workspaces:
+                  - name: shared-workspace
+                    volumeClaimTemplate:
+                      spec:
+                        accessModes:
+                          - ReadWriteOnce
+                        resources:
+                          requests:
+                            storage: 1Gi
+              EOF
+              )
+
+              echo "Started ${RUN}"
+              while true; do
+                STATUS=$(oc get pipelinerun "${RUN}" -o jsonpath='{.status.conditions[0].status}' 2>/dev/null || echo "Unknown")
+                REASON=$(oc get pipelinerun "${RUN}" -o jsonpath='{.status.conditions[0].reason}' 2>/dev/null || echo "")
+                if [ "${STATUS}" = "True" ]; then
+                  echo "${RUN}: Succeeded"
+                  exit 0
+                elif [ "${STATUS}" = "False" ]; then
+                  echo "${RUN}: Failed (${REASON})"
+                  exit 1
+                fi
+                sleep 10
+              done
+      params:
+        - name: repo-url
+          value: $(params.repo-url)
+        - name: repo-revision
+          value: $(params.repo-revision)
+        - name: namespace
+          value: $(params.namespace)
+        - name: camel-launcher-version
+          value: $(params.camel-launcher-version)
+        - name: runtime-version
+          value: $(params.runtime-version)

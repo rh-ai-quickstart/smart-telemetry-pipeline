@@ -1,0 +1,66 @@
+mode: deployment
+
+replicaCount: 1
+
+image:
+  repository: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib
+  tag: ""
+
+serviceAccount:
+  create: true
+  name: camel-otel-collector
+
+ports:
+  otlp:
+    enabled: true
+    containerPort: 4317
+    servicePort: 4317
+    protocol: TCP
+  otlp-http:
+    enabled: true
+    containerPort: 4318
+    servicePort: 4318
+    protocol: TCP
+
+config:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+
+  processors:
+    filter/healthcheck:
+      error_mode: ignore
+      traces:
+        span:
+          - 'name == "GET /actuator/health"'
+
+  exporters:
+    debug: {}
+    kafka:
+      brokers:
+        - kafka:9092
+      logs:
+        encoding: otlp_json
+      traces:
+        encoding: otlp_json
+
+  service:
+    pipelines:
+      logs:
+        receivers:
+          - otlp
+        exporters:
+          - debug
+          - kafka
+      traces:
+        receivers:
+          - otlp
+        processors:
+          - filter/healthcheck
+        exporters:
+          - debug
+          - kafka

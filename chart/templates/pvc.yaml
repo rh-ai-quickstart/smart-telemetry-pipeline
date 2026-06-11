@@ -1,0 +1,21 @@
+{{- range $name, $component := .Values.components }}
+{{- if and $component.enabled $component.storage }}
+{{- if $component.storage.mountPath }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $name }}-storage
+  labels:
+    app: {{ $name }}
+    app.kubernetes.io/name: {{ $name }}
+    app.kubernetes.io/part-of: smart-log-analyzer
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ $component.storage.size | default "1Gi" }}
+{{- end }}
+{{- end }}
+{{- end }}

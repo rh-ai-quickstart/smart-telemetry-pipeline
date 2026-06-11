@@ -1,0 +1,218 @@
+# Stores OpenTelemetry records in Infinispan cache, grouped by traceId
+# and marks ERROR events for deferred processing
+- route:
+    id: route-1200
+    description: Store telemetry records
+    from:
+      id: from-9847
+      uri: direct
+      parameters:
+        name: store
+      steps:
+        - log:
+            description: Log incoming record
+            id: log-record
+            loggingLevel: DEBUG
+            message: "Processing record: ${body}"
+        - setVariable:
+            description: Extract trace ID
+            jq:
+              expression: .traceId
+              resultType: java.lang.String
+            name: traceId
+        - filter:
+            description: Filter empty ID
+            expression:
+              simple: ${variable.traceId} != null && ${variable.traceId} != ''
+            steps:
+              - claimCheck:
+                  description: Save current body
+                  key: currentRecord
+                  operation: Set
+              - setHeader:
+                  description: Set cache key
+                  name: CamelInfinispanKey
+                  simple: otel-${variable.traceId}
+              - to:
+                  description: Get existing records
+                  uri: infinispan:events
+                  parameters:
+                    operation: GET
+              - choice:
+                  description: Check existing records
+                  otherwise:
+                    steps:
+                      - claimCheck:
+                          description: Restore current body
+                          key: currentRecord
+                          operation: Get
+                      - setBody:
+                          description: Create JSON array
+                          jq:
+                            expression: "[.]"
+                            resultType: java.lang.String
+                  when:
+                    - steps:
+                        - setVariable:
+                            description: Save existing records
+                            name: existingRecords
+                            simple: ${body}
+                        - claimCheck:
+                            description: Restore current body
+                            key: currentRecord
+                            operation: Get
+                        - setBody:
+                            description: Append to array
+                            jq:
+                              expression: (variable("existingRecords") | fromjson) + [.] |
+                                sort_by(.timeUnixNano)
+                              resultType: java.lang.String
+                      simple: ${body} != null && ${body} != ''
+              - setHeader:
+                  description: Set cache key
+                  name: CamelInfinispanKey
+                  simple: otel-${variable.traceId}
+              - setHeader:
+                  description: Set cache value
+                  name: CamelInfinispanValue
+                  simple: ${body}
+              - to:
+                  description: Put updated records
+                  uri: infinispan:events
+                  parameters:
+                    operation: PUT
+              - claimCheck:
+                  description: Remove saved body
+                  key: currentRecord
+                  operation: GetAndRemove
+              - setVariable:
+                  description: Extract record type for metric tag
+                  name: recordType
+                  jq:
+                    expression: .type // "unknown"
+                    resultType: java.lang.String
+              - toD:
+                  description: Increment events stored counter
+                  uri: "micrometer:counter:correlator.events.stored?tags=type=${variable.recordType}"
+              - log:
+                  description: Log stored record
+                  id: log-stored
+                  message: "Stored record for traceId: ${variable.traceId}"
+              - choice:
+                  description: Check error severity
+                  when:
+                    - steps:
+                        - to:
+                            description: Increment errors detected counter
+                            uri: "micrometer:counter:correlator.errors.detected"
+                        - log:
+                            description: Log error record
+                            message: "Adding ERROR log to events-to-process cache for traceId:
+                              ${variable.traceId}"
+                        - setHeader:
+                            description: Set error key
+                            name: CamelInfinispanKey
+                            simple: ${variable.traceId}
+                        - setHeader:
+                            description: Set error value
+                            name: CamelInfinispanValue
+                            simple: ${variable.traceId}
+                        - to:
+                            description: Mark to process
+                            uri: infinispan:events-to-process
+                            parameters:
+                              operation: PUTIFABSENT
+                      jq:
+                        expression: (.severityText // "" | ascii_downcase) == "error" or .status == "2"
+- route:
+    id: route-expired-events
+    description: Handle expired events
+    from:
+      uri: infinispan:events-to-process
+      parameters:
+        eventTypes: CLIENT_CACHE_ENTRY_EXPIRED
+      steps:
+        - setBody:
+            description: Get trace ID
+            simple: ${header.CamelInfinispanKey}
+        - to:
+            description: Increment events expired counter
+            uri: "micrometer:counter:correlator.events.expired"
+        - log:
+            description: Log expiration event
+            message: "Expired cache entry received, sending to JMS queue: ${body}"
+        - to:
+            description: Send to JMS
+            uri: jms:{{camel.jms.queue.error-logs}}
+# Saves a per-trace custom prompt to the ai-messages Infinispan cache
+- route:
+    id: route-ai-prompts
+    description: Save per-trace prompt to Infinispan
+    from:
+      uri: jms:{{camel.jms.queue.ai-prompts}}
+      steps:
+        - convertBodyTo:
+            description: Convert JMS body to string
+            type: String
+            charset: UTF-8
+        - log:
+            description: Log incoming prompt
+            message: "Received prompt for traceId: ${header.traceId}"
+        - setHeader:
+            description: Set cache key
+            name: CamelInfinispanKey
+            simple: ${header.traceId}-prompt-msg
+        - setHeader:
+            description: Set cache value
+            name: CamelInfinispanValue
+            simple: ${body}
+        - to:
+            description: Save prompt to cache
+            uri: infinispan:ai-messages
+            parameters:
+              operation: PUT
+        - log:
+            description: Log saved prompt
+            message: "Saved prompt for traceId: ${header.traceId}"
+# Reads per-trace prompt from ai-messages cache, falls back to default prompt-msg
+- route:
+    id: route-ai-prompts-read
+    description: Read per-trace or default prompt from Infinispan
+    from:
+      uri: jms:{{camel.jms.queue.ai-prompts-read}}
+      steps:
+        - log:
+            description: Log prompt read request
+            message: "Reading prompt for traceId: ${header.traceId}"
+        - setHeader:
+            description: Set per-trace prompt cache key
+            name: CamelInfinispanKey
+            simple: ${header.traceId}-prompt-msg
+        - to:
+            description: Get per-trace prompt from cache
+            uri: infinispan:ai-messages
+            parameters:
+              operation: GET
+        - convertBodyTo:
+            description: Convert to string
+            type: String
+        - choice:
+            description: Fallback to default prompt
+            when:
+              - simple: "${body} == null || ${body} == ''"
+                steps:
+                  - setHeader:
+                      description: Set default prompt cache key
+                      name: CamelInfinispanKey
+                      constant: prompt-msg
+                  - to:
+                      description: Get default prompt from cache
+                      uri: infinispan:ai-messages
+                      parameters:
+                        operation: GET
+                  - convertBodyTo:
+                      description: Convert to string
+                      type: String
+        - log:
+            description: Log prompt read result
+            message: "Returning prompt for traceId: ${header.traceId}"

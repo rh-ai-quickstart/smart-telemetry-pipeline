@@ -1,0 +1,22 @@
+{{- range $name, $component := .Values.components }}
+{{- if and $component.enabled $component.expose }}
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: {{ $name }}
+  labels:
+    app: {{ $name }}
+    app.kubernetes.io/name: {{ $name }}
+    app.kubernetes.io/part-of: smart-log-analyzer
+spec:
+  to:
+    kind: Service
+    name: {{ $name }}
+  port:
+    targetPort: 8080
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+{{- end }}
+{{- end }}

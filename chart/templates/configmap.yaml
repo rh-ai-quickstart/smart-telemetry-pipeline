@@ -1,0 +1,20 @@
+{{- range $name, $component := .Values.components }}
+{{- if $component.enabled }}
+{{- $propsFile := printf "properties/%s/application-prod-quarkus.properties" $name }}
+{{- $props := $.Files.Get $propsFile }}
+{{- if $props }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $name }}-config
+  labels:
+    app: {{ $name }}
+    app.kubernetes.io/name: {{ $name }}
+    app.kubernetes.io/part-of: smart-log-analyzer
+data:
+  application.properties: |
+{{ $props | indent 4 }}
+{{- end }}
+{{- end }}
+{{- end }}

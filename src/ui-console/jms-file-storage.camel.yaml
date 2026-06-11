@@ -1,0 +1,33 @@
+- route:
+    id: jms-to-file-storage
+    description: Persist analysis results
+    from:
+      uri: jms:{{camel.jms.queue.analysis-result}}
+      steps:
+        - log:
+            description: Log JMS message
+            message: "Received message from JMS queue: ${body}"
+        - choice:
+            description: Set filename based on operation type
+            when:
+              - simple: "${header.op} == 'interactive'"
+                steps:
+                  - setHeader:
+                      description: Set interactive file name
+                      name: CamelFileName
+                      simple: ${header.traceId}-it.txt
+            otherwise:
+              steps:
+                - setHeader:
+                    description: Set standard file name
+                    name: CamelFileName
+                    simple: ${header.traceId}.txt
+        - to:
+            description: Write to file
+            uri: file:{{analyzer.storage.root}}
+        - to:
+            description: Increment results stored counter
+            uri: "micrometer:counter:ui.results.stored"
+        - log:
+            description: Log file saved
+            message: "Saved content for traceId: ${header.traceId}"

@@ -1,0 +1,34 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: prepare-dockerfile
+spec:
+  params:
+    - name: export-dir
+      type: string
+      default: export
+      description: Path within the workspace to the exported project
+    - name: dockerfile-path
+      type: string
+      default: src/main/docker/Dockerfile.jvm
+      description: Destination path for the Dockerfile relative to export-dir
+  workspaces:
+    - name: source
+      description: Workspace containing the exported project
+  steps:
+    - name: write-dockerfile
+      image: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        CONFIG_MAP="base-image-config-quarkus"
+        DEST="$(workspaces.source.path)/$(params.export-dir)/$(params.dockerfile-path)"
+
+        mkdir -p "$(dirname "${DEST}")"
+
+        echo "Loading Dockerfile from ConfigMap ${CONFIG_MAP}..."
+        oc get configmap "${CONFIG_MAP}" -o jsonpath='{.data.Dockerfile}' > "${DEST}"
+
+        echo "Dockerfile written to ${DEST}"
+        cat "${DEST}"

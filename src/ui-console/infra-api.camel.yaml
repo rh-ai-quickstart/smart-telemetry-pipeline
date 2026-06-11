@@ -1,0 +1,288 @@
+# Metrics proxy API - proxies Prometheus scrape endpoints from Camel services
+# and analyzer state API
+- rest:
+    path: /api/metrics
+    get:
+      - id: get-correlator-metrics
+        path: /correlator
+        to: direct:correlator-metrics
+      - id: get-analyzer-metrics
+        path: /analyzer
+        to: direct:analyzer-metrics
+      - id: get-ui-metrics
+        path: /ui
+        to: direct:ui-metrics
+
+- rest:
+    path: /api/analyzer
+    get:
+      - id: proxy-analyzer-state
+        path: /state
+        produces: application/json
+        to: direct:proxy-analyzer-state
+
+- rest:
+    path: /api/infra
+    get:
+      - id: get-cache-stats
+        path: /cache-stats
+        produces: application/json
+        to: direct:cache-stats
+      - id: get-queue-stats
+        path: /queue-stats
+        produces: application/json
+        to: direct:queue-stats
+
+# Proxy correlator Prometheus metrics
+- route:
+    id: route-correlator-metrics
+    from:
+      uri: direct:correlator-metrics
+      steps:
+        - doTry:
+            steps:
+              - removeHeaders:
+                  pattern: "*"
+              - setHeader:
+                  name: CamelHttpMethod
+                  constant: GET
+              - toD:
+                  uri: "http://{{infra.correlator.metrics.url}}"
+              - convertBodyTo:
+                  type: String
+              - setHeader:
+                  name: Content-Type
+                  constant: "text/plain; version=0.0.4; charset=utf-8"
+            doCatch:
+              - exception:
+                  - java.lang.Exception
+                steps:
+                  - setHeader:
+                      name: CamelHttpResponseCode
+                      constant: 503
+                  - setBody:
+                      constant: "# Correlator metrics unavailable"
+                  - setHeader:
+                      name: Content-Type
+                      constant: "text/plain"
+
+# Proxy analyzer Prometheus metrics
+- route:
+    id: route-analyzer-metrics
+    from:
+      uri: direct:analyzer-metrics
+      steps:
+        - doTry:
+            steps:
+              - removeHeaders:
+                  pattern: "*"
+              - setHeader:
+                  name: CamelHttpMethod
+                  constant: GET
+              - toD:
+                  uri: "http://{{infra.analyzer.metrics.url}}"
+              - convertBodyTo:
+                  type: String
+              - setHeader:
+                  name: Content-Type
+                  constant: "text/plain; version=0.0.4; charset=utf-8"
+            doCatch:
+              - exception:
+                  - java.lang.Exception
+                steps:
+                  - setHeader:
+                      name: CamelHttpResponseCode
+                      constant: 503
+                  - setBody:
+                      constant: "# Analyzer metrics unavailable"
+                  - setHeader:
+                      name: Content-Type
+                      constant: "text/plain"
+
+# Proxy UI Console's own Prometheus metrics
+- route:
+    id: route-ui-metrics
+    from:
+      uri: direct:ui-metrics
+      steps:
+        - doTry:
+            steps:
+              - removeHeaders:
+                  pattern: "*"
+              - setHeader:
+                  name: CamelHttpMethod
+                  constant: GET
+              - toD:
+                  uri: "http://{{infra.ui.metrics.url}}"
+              - convertBodyTo:
+                  type: String
+              - setHeader:
+                  name: Content-Type
+                  constant: "text/plain; version=0.0.4; charset=utf-8"
+            doCatch:
+              - exception:
+                  - java.lang.Exception
+                steps:
+                  - setHeader:
+                      name: CamelHttpResponseCode
+                      constant: 503
+                  - setBody:
+                      constant: "# UI metrics unavailable"
+                  - setHeader:
+                      name: Content-Type
+                      constant: "text/plain"
+
+# Proxy analyzer state API
+- route:
+    id: route-proxy-analyzer-state
+    from:
+      uri: direct:proxy-analyzer-state
+      steps:
+        - doTry:
+            steps:
+              - removeHeaders:
+                  pattern: "*"
+              - setHeader:
+                  name: CamelHttpMethod
+                  constant: GET
+              - toD:
+                  uri: "http://{{infra.analyzer.state.url}}"
+              - convertBodyTo:
+                  type: String
+              - setHeader:
+                  name: Content-Type
+                  constant: application/json
+            doCatch:
+              - exception:
+                  - java.lang.Exception
+                steps:
+                  - setHeader:
+                      name: CamelHttpResponseCode
+                      constant: 503
+                  - setBody:
+                      constant: '{"active":false,"traceId":"","startedAtEpochMs":0,"updatedAtEpochMs":0}'
+                  - setHeader:
+                      name: Content-Type
+                      constant: application/json
+
+# Infinispan cache stats (events + events-to-process entry counts)
+- route:
+    id: route-cache-stats
+    from:
+      uri: direct:cache-stats
+      steps:
+        - doTry:
+            steps:
+              - removeHeaders:
+                  pattern: "*"
+              - setHeader:
+                  name: CamelHttpQuery
+                  constant: "action=stats"
+              - toD:
+                  uri: "http://{{infra.infinispan.host}}/rest/v2/caches/events?authMethod=Digest&authUsername={{infra.infinispan.user}}&authPassword={{infra.infinispan.password}}"
+              - convertBodyTo:
+                  type: String
+              - setVariable:
+                  name: eventsEntries
+                  jq:
+                    expression: >
+                      (.current_number_of_entries_in_memory // -1) as $c |
+                      if $c >= 0 then $c
+                      else (.approximate_entries_in_memory // .approximate_entries // 0)
+                      end
+                    resultType: java.lang.String
+              - removeHeaders:
+                  pattern: "*"
+              - setHeader:
+                  name: CamelHttpQuery
+                  constant: "action=stats"
+              - toD:
+                  uri: "http://{{infra.infinispan.host}}/rest/v2/caches/events-to-process?authMethod=Digest&authUsername={{infra.infinispan.user}}&authPassword={{infra.infinispan.password}}"
+              - convertBodyTo:
+                  type: String
+              - setVariable:
+                  name: etpEntries
+                  jq:
+                    expression: >
+                      (.current_number_of_entries_in_memory // -1) as $c |
+                      if $c >= 0 then $c
+                      else (.approximate_entries_in_memory // .approximate_entries // 0)
+                      end
+                    resultType: java.lang.String
+              - setBody:
+                  simple: >-
+                    {"events":${variable.eventsEntries},"eventsToProcess":${variable.etpEntries}}
+              - setHeader:
+                  name: Content-Type
+                  constant: application/json
+            doCatch:
+              - exception:
+                  - java.lang.Exception
+                steps:
+                  - setBody:
+                      constant: '{"events":-1,"eventsToProcess":-1}'
+                  - setHeader:
+                      name: Content-Type
+                      constant: application/json
+
+# Artemis queue stats (error-logs + analysis-result message counts)
+- route:
+    id: route-queue-stats
+    from:
+      uri: direct:queue-stats
+      steps:
+        - doTry:
+            steps:
+              - removeHeaders:
+                  pattern: "*"
+              - setBody:
+                  simple: "${null}"
+              - setHeader:
+                  name: _AMQ_ResourceName
+                  constant: "queue.error-logs"
+              - setHeader:
+                  name: _AMQ_Attribute
+                  constant: "messageCount"
+              - to:
+                  uri: "jms:queue:activemq.management?exchangePattern=InOut&requestTimeout=3000"
+              - convertBodyTo:
+                  type: String
+              - setVariable:
+                  name: errorLogsCount
+                  jq:
+                    expression: "try (.[0] | tonumber) catch -1"
+                    resultType: java.lang.String
+              - removeHeaders:
+                  pattern: "*"
+              - setBody:
+                  simple: "${null}"
+              - setHeader:
+                  name: _AMQ_ResourceName
+                  constant: "queue.analysis-result"
+              - setHeader:
+                  name: _AMQ_Attribute
+                  constant: "messageCount"
+              - to:
+                  uri: "jms:queue:activemq.management?exchangePattern=InOut&requestTimeout=3000"
+              - convertBodyTo:
+                  type: String
+              - setVariable:
+                  name: analysisResultCount
+                  jq:
+                    expression: "try (.[0] | tonumber) catch -1"
+                    resultType: java.lang.String
+              - setBody:
+                  simple: >-
+                    {"errorLogs":${variable.errorLogsCount},"analysisResult":${variable.analysisResultCount}}
+              - setHeader:
+                  name: Content-Type
+                  constant: application/json
+            doCatch:
+              - exception:
+                  - java.lang.Exception
+                steps:
+                  - setBody:
+                      constant: '{"errorLogs":-1,"analysisResult":-1}'
+                  - setHeader:
+                      name: Content-Type
+                      constant: application/json

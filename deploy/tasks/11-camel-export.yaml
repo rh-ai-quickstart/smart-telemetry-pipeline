@@ -1,0 +1,72 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: camel-export
+spec:
+  params:
+    - name: app-path
+      type: string
+      description: Path within the repository to the Camel application to export
+    - name: camel-image
+      type: string
+      default: "camel-launcher:latest"
+      description: Image containing the Camel CLI
+    - name: gav
+      type: string
+      default: "com.example:camel-app:1.0.0"
+      description: Maven groupId:artifactId:version for the exported project
+    - name: runtime-version
+      type: string
+      default: ""
+      description: "Quarkus version. If empty, uses the default from camel export"
+    - name: deps
+      type: string
+      default: ""
+      description: "Comma-separated list of additional dependencies to add via --dep"
+    - name: export-dir
+      type: string
+      default: "export"
+      description: Output directory for the exported Quarkus project
+  workspaces:
+    - name: source
+      description: Workspace containing the cloned repository
+  steps:
+    - name: export
+      image: $(params.camel-image)
+      workingDir: $(workspaces.source.path)/$(params.app-path)
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        EXPORT_DIR="$(workspaces.source.path)/$(params.export-dir)"
+
+        echo "Exporting Camel application from $(params.app-path) to quarkus..."
+        echo "Output directory: ${EXPORT_DIR}"
+        echo "GAV: $(params.gav)"
+
+        EXTRA_ARGS=""
+        VERSION="$(params.runtime-version)"
+        if [ -n "${VERSION}" ]; then
+          EXTRA_ARGS="--quarkus-version=${VERSION}"
+          export JAVA_OPTS="${JAVA_OPTS:-} -Dcamel.jbang.quarkusVersion=${VERSION}"
+        fi
+
+        DEP_ARGS=""
+        DEPS="$(params.deps)"
+        if [ -n "${DEPS}" ]; then
+          DEP_ARGS="--dep=${DEPS}"
+        fi
+
+        CMD="camel export --runtime=quarkus ${EXTRA_ARGS} ${DEP_ARGS} --gav=$(params.gav) --fresh --dir=${EXPORT_DIR}"
+        echo "Running: ${CMD}"
+        eval "${CMD}"
+
+        echo "Export completed. Contents of ${EXPORT_DIR}:"
+        ls -la "${EXPORT_DIR}"
+        echo "Generated pom.xml:"
+        cat "${EXPORT_DIR}/pom.xml"
+    - name: fix-permissions
+      image: registry.access.redhat.com/ubi10/ubi-minimal:latest
+      script: |
+        #!/usr/bin/env bash
+        chown -R 65532:0 $(workspaces.source.path)/$(params.export-dir)

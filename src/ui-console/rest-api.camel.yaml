@@ -1,0 +1,293 @@
+- rest:
+    description: Traces API REST
+    path: /api/traces
+    get:
+      - id: list-traces
+        description: List traces
+        produces: application/json
+        to: direct:list-traces
+      - id: get-trace-by-id
+        description: Get trace
+        path: /{id}
+        produces: application/json
+        to: direct:get-trace
+      - id: get-trace-prompt
+        description: Get prompt for trace
+        path: /{id}/prompt
+        produces: text/plain
+        to: direct:get-trace-prompt
+      - id: get-interactive-result
+        description: Get interactive analysis result
+        path: /{id}/interactive
+        produces: application/json
+        to: direct:get-interactive-result
+    post:
+      - id: post-trace-prompt
+        description: Save custom prompt for trace
+        path: /{id}/prompt
+        consumes: text/plain
+        to: direct:post-trace-prompt
+      - id: post-interactive-analysis
+        description: Trigger interactive analysis
+        path: /{id}/interactive
+        to: direct:post-interactive-analysis
+
+- route:
+    id: route-list-traces
+    description: List stored traces
+    from:
+      uri: direct:list-traces
+      steps:
+        - setVariable:
+            description: Set storage path
+            name: storagePath
+            simple: "{{analyzer.storage.root}}"
+        - setBody:
+            description: List trace files
+            groovy: |
+              import java.nio.file.*
+              try {
+                def path = Paths.get(exchange.getVariable('storagePath'))
+                if (!Files.exists(path)) {
+                  return []
+                }
+                return Files.list(path)
+                  .filter(Files::isRegularFile)
+                  .filter(p -> p.getFileName().toString().endsWith('.txt'))
+                .filter(p -> !p.getFileName().toString().endsWith('-it.txt'))
+                  .map(p -> {
+                    def filename = p.getFileName().toString()
+                    def traceId = filename.substring(0, filename.lastIndexOf('.txt'))
+                    return [id: traceId]
+                  })
+                  .collect()
+              } catch (Exception e) {
+                return []
+              }
+        - marshal:
+            description: Marshal JSON
+            json:
+              library: Jackson
+        - setHeader:
+            description: Set JSON type
+            name: Content-Type
+            constant: application/json
+
+- route:
+    id: route-get-trace
+    description: Fetch trace file
+    from:
+      uri: direct:get-trace
+      steps:
+        - setVariable:
+            description: Read trace ID
+            name: traceId
+            simple: ${header.id}
+        - pollEnrich:
+            description: Read trace file
+            expression:
+              simple: file:{{analyzer.storage.root}}?fileName=${variable.traceId}.txt&noop=true&idempotent=false
+            timeout: 1000
+        - choice:
+            description: Check file found
+            when:
+              - simple: ${body} != null
+                steps:
+                  - convertBodyTo:
+                      description: Body to string
+                      type: String
+                  - setVariable:
+                      description: Save file content
+                      name: fileContent
+                      simple: ${body}
+                  - marshal:
+                      description: Marshal JSON
+                      json: {}
+                  - setBody:
+                      description: Build trace JSON
+                      simple: '{"id":"${variable.traceId}","content":${body}}'
+                  - setHeader:
+                      description: Set JSON type
+                      name: Content-Type
+                      constant: application/json
+            otherwise:
+              steps:
+                - setHeader:
+                    description: Set HTTP 404
+                    name: CamelHttpResponseCode
+                    constant: 404
+                - setBody:
+                    description: Set error body
+                    constant: '{"error":"Trace not found"}'
+                - setHeader:
+                    description: Set JSON type
+                    name: Content-Type
+                    constant: application/json
+
+# Get prompt for a trace via JMS request/reply to correlator
+- route:
+    id: route-get-trace-prompt
+    description: Get prompt for a trace
+    from:
+      uri: direct:get-trace-prompt
+      steps:
+        - setVariable:
+            description: Save trace ID
+            name: traceId
+            simple: ${header.id}
+        - removeHeaders:
+            pattern: "*"
+        - setHeader:
+            description: Set trace ID header
+            name: traceId
+            simple: ${variable.traceId}
+        - setBody:
+            description: Set empty body
+            constant: ""
+        - to:
+            description: Request prompt from correlator
+            uri: "jms:queue:{{camel.jms.queue.ai-prompts-read}}?exchangePattern=InOut&requestTimeout=5000"
+        - convertBodyTo:
+            description: Convert JMS reply to string
+            type: String
+            charset: UTF-8
+        - setHeader:
+            description: Set content type
+            name: Content-Type
+            constant: text/plain
+
+# Save custom prompt for a trace (fire-and-forget)
+- route:
+    id: route-post-trace-prompt
+    description: Save custom prompt for a trace
+    from:
+      uri: direct:post-trace-prompt
+      steps:
+        - setVariable:
+            description: Save trace ID
+            name: traceId
+            simple: ${header.id}
+        - setVariable:
+            description: Save prompt body
+            name: promptBody
+            simple: ${body}
+        - removeHeaders:
+            pattern: "*"
+        - setHeader:
+            description: Set trace ID header
+            name: traceId
+            simple: ${variable.traceId}
+        - setBody:
+            description: Restore prompt body
+            simple: ${variable.promptBody}
+        - to:
+            description: Send prompt to correlator
+            uri: "jms:queue:{{camel.jms.queue.ai-prompts}}?exchangePattern=InOnly"
+        - setHeader:
+            description: Set HTTP 202
+            name: CamelHttpResponseCode
+            constant: 202
+        - setBody:
+            description: Set response
+            constant: '{"status":"accepted"}'
+        - setHeader:
+            description: Set content type
+            name: Content-Type
+            constant: application/json
+
+# Trigger interactive analysis: delete stale result, send to error-logs with op=interactive
+- route:
+    id: route-post-interactive
+    description: Trigger interactive analysis
+    from:
+      uri: direct:post-interactive-analysis
+      steps:
+        - setVariable:
+            description: Save trace ID
+            name: traceId
+            simple: ${header.id}
+        - setBody:
+            description: Delete existing interactive file
+            groovy: |
+              import java.nio.file.*
+              def path = Paths.get(exchange.context.resolvePropertyPlaceholders('{{analyzer.storage.root}}'), exchange.getVariable('traceId') + '-it.txt')
+              Files.deleteIfExists(path)
+              return null
+        - removeHeaders:
+            pattern: "*"
+        - setHeader:
+            description: Set op header
+            name: op
+            constant: interactive
+        - setBody:
+            description: Set trace ID as body
+            simple: ${variable.traceId}
+        - to:
+            description: Send to interactive queue
+            uri: "jms:queue:{{camel.jms.queue.error-logs-interactive}}?exchangePattern=InOnly"
+        - to:
+            description: Increment interactive analyses triggered counter
+            uri: "micrometer:counter:ui.interactive.triggered"
+        - setHeader:
+            description: Set HTTP 202
+            name: CamelHttpResponseCode
+            constant: 202
+        - setBody:
+            description: Set response
+            constant: '{"status":"accepted"}'
+        - setHeader:
+            description: Set content type
+            name: Content-Type
+            constant: application/json
+
+# Read interactive analysis result file
+- route:
+    id: route-get-interactive-result
+    description: Get interactive analysis result
+    from:
+      uri: direct:get-interactive-result
+      steps:
+        - setVariable:
+            description: Read trace ID
+            name: traceId
+            simple: ${header.id}
+        - pollEnrich:
+            description: Read interactive result file
+            expression:
+              simple: file:{{analyzer.storage.root}}?fileName=${variable.traceId}-it.txt&noop=true&idempotent=false
+            timeout: 1000
+        - choice:
+            description: Check file found
+            when:
+              - simple: ${body} != null
+                steps:
+                  - convertBodyTo:
+                      description: Body to string
+                      type: String
+                  - setVariable:
+                      description: Save file content
+                      name: fileContent
+                      simple: ${body}
+                  - marshal:
+                      description: Marshal JSON
+                      json: {}
+                  - setBody:
+                      description: Build result JSON
+                      simple: '{"id":"${variable.traceId}","content":${body}}'
+                  - setHeader:
+                      description: Set JSON type
+                      name: Content-Type
+                      constant: application/json
+            otherwise:
+              steps:
+                - setHeader:
+                    description: Set HTTP 404
+                    name: CamelHttpResponseCode
+                    constant: 404
+                - setBody:
+                    description: Set error body
+                    constant: '{"error":"Interactive analysis not found"}'
+                - setHeader:
+                    description: Set JSON type
+                    name: Content-Type
+                    constant: application/json

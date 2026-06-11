@@ -1,0 +1,54 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: infinispan
+  labels:
+    app: infinispan
+spec:
+  ports:
+    - port: 11222
+      name: hotrod
+  selector:
+    app: infinispan
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: infinispan
+  labels:
+    app: infinispan
+    app.kubernetes.io/part-of: smart-log-analyzer
+    app.openshift.io/runtime: infinispan
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: infinispan
+  template:
+    metadata:
+      labels:
+        app: infinispan
+    spec:
+      containers:
+        - name: infinispan
+          image: quay.io/infinispan/server:16.0
+          ports:
+            - containerPort: 11222
+          env:
+            - name: USER
+              valueFrom:
+                secretKeyRef:
+                  name: infra-accounts
+                  key: DATAGRID_USERNAME
+            - name: PASS
+              valueFrom:
+                secretKeyRef:
+                  name: infra-accounts
+                  key: DATAGRID_PASSWORD
+          resources:
+            requests:
+              memory: 256Mi
+              cpu: 250m
+            limits:
+              memory: 512Mi

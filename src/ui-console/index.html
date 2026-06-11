@@ -1,0 +1,1201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Log Analyzer - Console</title>
+    <link rel="stylesheet" href="https://unpkg.com/carbon-components@10.58.0/css/carbon-components.min.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600&display=swap">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif;
+            background-color: #f4f4f4;
+        }
+
+        .bx--header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 8000;
+        }
+
+        .bx--header__nav {
+            height: 100%;
+            margin-left: 2rem;
+        }
+
+        .bx--header__menu-bar {
+            display: flex;
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            height: 100%;
+        }
+
+        .bx--header__menu-item {
+            display: flex;
+            align-items: center;
+            height: 100%;
+            padding: 0 1rem;
+            color: #c6c6c6;
+            text-decoration: none;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+        }
+
+        .bx--header__menu-item:hover {
+            color: #ffffff;
+            background-color: #393939;
+        }
+
+        .bx--header__menu-item--current {
+            color: #ffffff;
+            border-bottom: 2px solid #0f62fe;
+        }
+
+        .camel-logo {
+            width: 32px;
+            height: 32px;
+            margin-right: 0.75rem;
+            vertical-align: middle;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+            padding-top: 48px;
+        }
+
+        .sidebar {
+            width: 320px;
+            background-color: #161616;
+            color: #f4f4f4;
+            padding: 1rem;
+            overflow-y: auto;
+            border-right: 1px solid #393939;
+        }
+
+        .main-content {
+            flex: 1;
+            padding: 2rem;
+            overflow-y: auto;
+            background-color: #f4f4f4;
+        }
+
+        .trace-list {
+            list-style: none;
+            padding: 0;
+            margin-top: 1rem;
+        }
+
+        .trace-item {
+            padding: 0.75rem 1rem;
+            margin-bottom: 0.5rem;
+            background-color: #262626;
+            cursor: pointer;
+            transition: background-color 0.11s;
+            border-left: 3px solid transparent;
+        }
+
+        .trace-item:hover {
+            background-color: #333333;
+        }
+
+        .trace-item.active {
+            background-color: #0f62fe;
+            border-left-color: #78a9ff;
+        }
+
+        .trace-id {
+            font-size: 0.875rem;
+            word-break: break-all;
+            font-family: 'IBM Plex Mono', monospace;
+        }
+
+        .content-body {
+            background-color: #ffffff;
+            padding: 1rem;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.875rem;
+            line-height: 1.6;
+            max-height: calc(100vh - 250px);
+            overflow-y: auto;
+            border: 1px solid #e0e0e0;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: #525252;
+            padding: 4rem 2rem;
+        }
+
+        .empty-state-icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 1rem;
+            display: block;
+        }
+
+        .count-badge {
+            display: inline-block;
+            background-color: #0f62fe;
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 1rem;
+            font-size: 0.75rem;
+            margin-left: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .sidebar-header {
+            margin-bottom: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid #393939;
+        }
+
+        .sidebar-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        /* Infra specific styles */
+        .node-rect {
+            fill: #ffffff;
+            stroke: #0f62fe;
+            stroke-width: 2;
+            rx: 4;
+        }
+
+        .node-rect.node-active {
+            stroke: #198038;
+            stroke-width: 3;
+            animation: nodePulse 1.2s ease-in-out infinite;
+        }
+
+        .node-rect.node-pending {
+            stroke: #f1c21b;
+            stroke-width: 3;
+        }
+
+        .node-rect.node-idle {
+            stroke: #8d8d8d;
+            stroke-width: 2;
+        }
+
+        @keyframes nodePulse {
+            0% { filter: drop-shadow(0px 0px 0px rgba(25, 128, 56, 0)); }
+            50% { filter: drop-shadow(0px 0px 6px rgba(25, 128, 56, 0.6)); }
+            100% { filter: drop-shadow(0px 0px 0px rgba(25, 128, 56, 0)); }
+        }
+
+        .node-text-title {
+            font-family: 'IBM Plex Sans', sans-serif;
+            font-weight: 600;
+            font-size: 14px;
+            fill: #161616;
+            text-anchor: middle;
+        }
+
+        .node-text-sub {
+            font-family: 'IBM Plex Sans', sans-serif;
+            font-size: 12px;
+            fill: #525252;
+            text-anchor: middle;
+        }
+
+        .metric-text {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 12px;
+            fill: #0f62fe;
+            text-anchor: middle;
+        }
+
+        .metric-label {
+            font-family: 'IBM Plex Sans', sans-serif;
+            font-size: 10px;
+            fill: #525252;
+            text-anchor: middle;
+        }
+
+        .view-section {
+            display: none;
+        }
+
+        .view-section.active {
+            display: flex;
+        }
+
+        .node-clickable { cursor: pointer; }
+        .node-clickable:hover .node-rect { stroke-width: 3; filter: drop-shadow(0 0 4px rgba(15,98,254,0.4)); }
+
+        /* Modal styles */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(22, 22, 22, 0.7);
+            z-index: 9000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-overlay.open { display: flex; }
+        .modal-content {
+            background: #ffffff;
+            width: 560px;
+            max-height: 80vh;
+            overflow-y: auto;
+            border: 1px solid #e0e0e0;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid #e0e0e0;
+            background: #f4f4f4;
+        }
+        .modal-header h3 { margin: 0; font-size: 1.1rem; font-weight: 600; }
+        .modal-close {
+            background: none; border: none; cursor: pointer;
+            font-size: 1.25rem; color: #525252; padding: 0.25rem;
+        }
+        .modal-close:hover { color: #161616; }
+        .modal-body { padding: 1.5rem; }
+        .modal-section { margin-bottom: 1.25rem; }
+        .modal-section:last-child { margin-bottom: 0; }
+        .modal-section-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.32px;
+            color: #525252;
+            margin-bottom: 0.5rem;
+            padding-bottom: 0.25rem;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .modal-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.3rem 0;
+            font-size: 0.875rem;
+        }
+        .modal-row-label { color: #525252; }
+        .modal-row-value { font-family: 'IBM Plex Mono', monospace; font-weight: 600; color: #161616; }
+        .modal-bar-container {
+            margin-top: 0.25rem;
+            height: 6px;
+            background: #e0e0e0;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .modal-bar {
+            height: 100%;
+            background: #0f62fe;
+            border-radius: 3px;
+            transition: width 0.3s;
+        }
+        .modal-bar.warn { background: #f1c21b; }
+        .modal-bar.danger { background: #da1e28; }
+
+        /* Interactive Analysis styles */
+        .interactive-container {
+            padding: 1.5rem;
+        }
+
+        .interactive-section {
+            margin-bottom: 1.5rem;
+        }
+
+        .interactive-section label {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.32px;
+            color: #525252;
+            margin-bottom: 0.5rem;
+        }
+
+        .interactive-textarea {
+            width: 100%;
+            min-height: 120px;
+            padding: 0.75rem;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.875rem;
+            line-height: 1.5;
+            border: 1px solid #e0e0e0;
+            background-color: #ffffff;
+            resize: vertical;
+            box-sizing: border-box;
+        }
+
+        .interactive-textarea:focus {
+            outline: 2px solid #0f62fe;
+            border-color: #0f62fe;
+        }
+
+        .interactive-result {
+            background-color: #ffffff;
+            padding: 1rem;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.875rem;
+            line-height: 1.6;
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #e0e0e0;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #ffffff;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 0.5rem;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bx--body">
+    <header class="bx--header" role="banner">
+        <a class="bx--header__name" href="javascript:void(0)">
+            <img src="https://raw.githubusercontent.com/apache/camel/refs/heads/main/docs/img/logo-d.svg" alt="Apache Camel" class="camel-logo">
+            <span class="bx--header__name--prefix">Smart Log</span>
+            Analyzer
+        </a>
+        <nav class="bx--header__nav">
+            <ul class="bx--header__menu-bar" aria-label="Main Navigation">
+                <li>
+                    <a id="nav-trace" class="bx--header__menu-item bx--header__menu-item--current" onclick="switchView('trace')">Trace Analysis</a>
+                </li>
+                <li>
+                    <a id="nav-infra" class="bx--header__menu-item" onclick="switchView('infra')">Infrastructure</a>
+                </li>
+            </ul>
+        </nav>
+    </header>
+
+    <!-- Trace Analysis View -->
+    <div id="view-trace" class="container view-section active">
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-title">Trace Analysis</div>
+                <div id="traceCount"></div>
+            </div>
+            <div class="bx--form-item">
+                <input
+                    type="text"
+                    class="bx--text-input bx--text-input--light"
+                    id="searchBox"
+                    placeholder="Search trace IDs...">
+            </div>
+            <ul class="trace-list" id="traceList"></ul>
+        </div>
+        <div class="main-content">
+            <div id="contentPanel"></div>
+        </div>
+    </div>
+
+    <!-- Infrastructure View -->
+    <div id="view-infra" class="view-section" style="height: 100vh; padding-top: 48px; flex-direction: column;">
+        <div style="padding: 2rem; flex: 1;">
+            <div class="bx--tile" style="height: 100%; display: flex; flex-direction: column;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h3 class="bx--type-productive-heading-03">Infrastructure State</h3>
+                    <div>
+                        <span id="infra-poll-status" class="bx--tag bx--tag--blue">Polling Active</span>
+                    </div>
+                </div>
+
+                <div style="flex: 1; min-height: 500px; display: flex; justify-content: center; align-items: center; background-color: #f4f4f4; border: 1px solid #e0e0e0;">
+                    <svg id="infra-canvas" width="1100" height="480" viewBox="0 0 1100 480">
+                        <defs>
+                            <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                                <polygon points="0 0, 10 3.5, 0 7" fill="#8d8d8d" />
+                            </marker>
+                        </defs>
+
+                        <!-- Edges -->
+                        <!-- N1 to N2 -->
+                        <path d="M 180 80 L 280 80" stroke="#8d8d8d" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+                        <text x="230" y="68" class="metric-label">spans and logs</text>
+
+                        <!-- N2 to N3 -->
+                        <path d="M 460 80 L 560 80" stroke="#8d8d8d" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+                        <text x="510" y="60" class="metric-text" id="metric-total-processed">0</text>
+                        <text x="510" y="72" class="metric-label">total processed</text>
+
+                        <!-- N3 to N4 -->
+                        <path d="M 740 80 L 840 80" stroke="#8d8d8d" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+                        <text x="790" y="60" class="metric-text" id="metric-cache-stores">0</text>
+                        <text x="790" y="72" class="metric-label">stores/s</text>
+
+                        <!-- N3 to N5 -->
+                        <path d="M 650 110 L 650 190" stroke="#8d8d8d" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+                        <text x="695" y="145" class="metric-text" id="metric-errors-detected">0</text>
+                        <text x="695" y="157" class="metric-label">errors detected</text>
+
+                        <!-- N5 to N6 -->
+                        <path d="M 650 260 L 650 340" stroke="#8d8d8d" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+                        <text x="695" y="270" class="metric-text" id="metric-events-expired">0</text>
+                        <text x="695" y="282" class="metric-label">sent to analyze</text>
+                        <text x="695" y="296" class="metric-text" id="metric-interactive-triggered">0</text>
+                        <text x="695" y="308" class="metric-label">interactive</text>
+                        <text x="695" y="322" class="metric-text" id="metric-error-queued" style="font-size: 10px; fill: #da1e28;">0</text>
+                        <text x="695" y="334" class="metric-label">queued</text>
+
+                        <!-- N6 to N7 -->
+                        <path d="M 740 370 L 840 370" stroke="#8d8d8d" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+                        <text x="790" y="352" class="metric-text" id="metric-llm-duration">-</text>
+                        <text x="790" y="364" class="metric-label">avg LLM latency</text>
+
+                        <!-- N6 to N8 (Right to Left) -->
+                        <path d="M 560 370 L 460 370" stroke="#8d8d8d" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+                        <text x="510" y="352" class="metric-text" id="metric-analyses-completed">0</text>
+                        <text x="510" y="364" class="metric-label">analyzed</text>
+
+                        <!-- N8 to N9 (Right to Left) -->
+                        <path d="M 280 370 L 180 370" stroke="#8d8d8d" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+                        <text x="230" y="352" class="metric-text" id="metric-results-stored">0</text>
+                        <text x="230" y="364" class="metric-label">stored results</text>
+
+                        <!-- Nodes -->
+                        <!-- 1. OTEL Collector -->
+                        <g transform="translate(20, 50)">
+                            <rect width="160" height="60" class="node-rect"/>
+                            <text x="80" y="26" class="node-text-title">OTEL Collector</text>
+                            <text x="80" y="44" class="node-text-sub">OpenTelemetry</text>
+                        </g>
+
+                        <!-- 2. Kafka -->
+                        <g transform="translate(290, 50)">
+                            <rect width="160" height="60" class="node-rect"/>
+                            <text x="80" y="26" class="node-text-title">OTEL Data</text>
+                            <text x="80" y="44" class="node-text-sub">Kafka</text>
+                        </g>
+
+                        <!-- 3. Correlator (clickable) -->
+                        <g transform="translate(570, 50)" class="node-clickable" onclick="openModal('correlator')">
+                            <rect width="160" height="60" class="node-rect"/>
+                            <text x="80" y="26" class="node-text-title">Correlator</text>
+                            <text x="80" y="44" class="node-text-sub">Camel</text>
+                        </g>
+
+                        <!-- 4. Event Cache -->
+                        <g transform="translate(850, 50)">
+                            <rect width="160" height="60" class="node-rect"/>
+                            <text x="80" y="26" class="node-text-title">Event Cache</text>
+                            <text x="80" y="44" class="node-text-sub">Infinispan</text>
+                            <text x="80" y="74" class="metric-text" id="metric-cache-entries" style="font-size: 10px;">-</text>
+                        </g>
+
+                        <!-- 5. Error Queue -->
+                        <g transform="translate(570, 200)">
+                            <rect width="160" height="60" class="node-rect"/>
+                            <text x="80" y="26" class="node-text-title">Error Queue</text>
+                            <text x="80" y="44" class="node-text-sub">Artemis</text>
+                            <text x="80" y="74" class="metric-text" id="metric-pending-errors" style="font-size: 10px;">-</text>
+                        </g>
+
+                        <!-- 6. Analyzer (clickable) -->
+                        <g id="node-analyzer" transform="translate(570, 340)" class="node-clickable" onclick="openModal('analyzer')">
+                            <rect id="node-analyzer-rect" width="160" height="60" class="node-rect node-idle"/>
+                            <text x="80" y="26" class="node-text-title">Analyzer</text>
+                            <text x="80" y="44" class="node-text-sub">Camel</text>
+                            <text x="80" y="74" class="metric-text" id="metric-analyzer-status" style="font-size: 10px; fill: #8d8d8d;">IDLE</text>
+                        </g>
+
+                        <!-- 7. OpenAI -->
+                        <g transform="translate(850, 340)">
+                            <rect width="160" height="60" class="node-rect"/>
+                            <text x="80" y="26" class="node-text-title">Root Cause Analysis</text>
+                            <text x="80" y="44" class="node-text-sub">OpenAI-Compatible</text>
+                        </g>
+
+                        <!-- 8. Analysis Result -->
+                        <g transform="translate(290, 340)">
+                            <rect width="160" height="60" class="node-rect"/>
+                            <text x="80" y="26" class="node-text-title">Analysis Result</text>
+                            <text x="80" y="44" class="node-text-sub">Artemis</text>
+                        </g>
+
+                        <!-- 9. UI Console (clickable) -->
+                        <g transform="translate(20, 340)" class="node-clickable" onclick="openModal('ui')">
+                            <rect width="160" height="60" class="node-rect"/>
+                            <text x="80" y="26" class="node-text-title">UI Console</text>
+                            <text x="80" y="44" class="node-text-sub">Storage & API</text>
+                        </g>
+                    </svg>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detail Modal -->
+    <div id="detail-modal" class="modal-overlay" onclick="if(event.target===this)closeModal()">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-title">Service Details</h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="modal-body">
+                Loading...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api/traces';
+
+        let allTraces = [];
+        let selectedTraceId = null;
+        let currentTraceContent = '';
+
+        // Cached Prometheus metrics per service
+        let metricsCache = { correlator: {}, analyzer: {}, ui: {} };
+        let lastMetricsCache = { correlator: {}, analyzer: {}, ui: {} };
+        let lastPollTime = null;
+
+        // ── View Switching ──
+        function switchView(viewName) {
+            document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.bx--header__menu-item').forEach(el => el.classList.remove('bx--header__menu-item--current'));
+            document.getElementById(`view-${viewName}`).classList.add('active');
+            document.getElementById(`nav-${viewName}`).classList.add('bx--header__menu-item--current');
+        }
+
+        // ── Trace Analysis ──
+        async function loadTraces() {
+            try {
+                const response = await fetch(API_BASE);
+                if (!response.ok) throw new Error('Failed to fetch traces');
+                const data = await response.json();
+                allTraces = data || [];
+                renderTraceList(allTraces);
+            } catch (error) {
+                console.error('Error loading traces:', error);
+                document.getElementById('traceList').innerHTML = `
+                    <div class="bx--inline-notification bx--inline-notification--error" role="alert" style="margin-top: 1rem;">
+                        <div class="bx--inline-notification__details">
+                            <div class="bx--inline-notification__text-wrapper">
+                                <p class="bx--inline-notification__subtitle">Failed to load traces. Make sure the API server is running.</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        function renderTraceList(traces) {
+            const traceList = document.getElementById('traceList');
+            const traceCount = document.getElementById('traceCount');
+            traceCount.innerHTML = `<span class="count-badge">${traces.length} trace${traces.length !== 1 ? 's' : ''}</span>`;
+            if (traces.length === 0) {
+                traceList.innerHTML = '<div style="padding: 1rem; color: #525252; text-align: center;">No traces found</div>';
+                return;
+            }
+            traceList.innerHTML = traces.map(trace => `
+                <li class="trace-item ${trace.id === selectedTraceId ? 'active' : ''}"
+                    onclick="loadTraceContent('${trace.id}')">
+                    <div class="trace-id">${escapeHtml(trace.id)}</div>
+                </li>
+            `).join('');
+        }
+
+        async function loadTraceContent(traceId) {
+            selectedTraceId = traceId;
+            renderTraceList(filterTraces(document.getElementById('searchBox').value));
+            const contentPanel = document.getElementById('contentPanel');
+            contentPanel.innerHTML = `
+                <div class="bx--loading bx--loading--small">
+                    <svg class="bx--loading__svg" viewBox="0 0 100 100">
+                        <circle class="bx--loading__stroke" cx="50%" cy="50%" r="44"></circle>
+                    </svg>
+                </div>
+            `;
+            try {
+                const response = await fetch(`${API_BASE}/${traceId}`);
+                if (!response.ok) throw new Error('Trace not found');
+                const data = await response.json();
+                currentTraceContent = data.content;
+                contentPanel.innerHTML = `
+                    <div class="bx--tile" style="padding: 0;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 1.5rem; border-bottom: 1px solid #e0e0e0;">
+                            <h3 class="bx--type-productive-heading-03">Trace: ${escapeHtml(data.id)}</h3>
+                            <div class="btn-group">
+                                <button class="bx--btn bx--btn--primary bx--btn--sm" onclick="loadTraceContent('${escapeHtml(traceId)}')">Refresh</button>
+                                <button class="bx--btn bx--btn--tertiary bx--btn--sm" onclick="openInteractiveAnalysis('${escapeHtml(traceId)}')">Interactive Analysis</button>
+                            </div>
+                        </div>
+                        <div style="padding: 1.5rem;">
+                            <div class="content-body">${escapeHtml(data.content)}</div>
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error loading trace content:', error);
+                contentPanel.innerHTML = `
+                    <div class="bx--inline-notification bx--inline-notification--error" role="alert">
+                        <div class="bx--inline-notification__details">
+                            <div class="bx--inline-notification__text-wrapper">
+                                <p class="bx--inline-notification__title">Error</p>
+                                <p class="bx--inline-notification__subtitle">Failed to load trace content</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        function filterTraces(searchTerm) {
+            if (!searchTerm) return allTraces;
+            const term = searchTerm.toLowerCase();
+            return allTraces.filter(t => t.id.toLowerCase().includes(term));
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        document.getElementById('searchBox').addEventListener('input', (e) => {
+            renderTraceList(filterTraces(e.target.value));
+        });
+
+        // ── Prometheus Helpers ──
+        function parsePrometheus(text) {
+            const metrics = {};
+            for (const line of text.split('\n')) {
+                if (line.startsWith('#') || !line.trim()) continue;
+                const match = line.match(/^([a-zA-Z_:][a-zA-Z0-9_:]*(?:\{[^}]*\})?) +([^ ]+)/);
+                if (match) metrics[match[1]] = parseFloat(match[2]);
+            }
+            return metrics;
+        }
+
+        function getMetric(metrics, name) {
+            if (metrics[name] !== undefined) return metrics[name];
+            if (metrics[name + '_total'] !== undefined) return metrics[name + '_total'];
+            return undefined;
+        }
+
+        function sumMetric(metrics, name) {
+            let total = 0, found = false;
+            for (const [key, val] of Object.entries(metrics)) {
+                if (key === name || key === name + '_total' ||
+                    key.startsWith(name + '{') || key.startsWith(name + '_total{')) {
+                    total += val;
+                    found = true;
+                }
+            }
+            return found ? total : undefined;
+        }
+
+        // Extract metrics matching a prefix, grouped by a label value
+        function getMetricsByRoute(metrics, prefix) {
+            const routes = {};
+            for (const [key, val] of Object.entries(metrics)) {
+                if (!key.startsWith(prefix)) continue;
+                const routeMatch = key.match(/routeId="([^"]+)"/);
+                if (routeMatch) {
+                    const routeId = routeMatch[1];
+                    if (!routes[routeId]) routes[routeId] = {};
+                    // Extract the suffix after the prefix (e.g. _count, _sum, _max)
+                    const baseEnd = key.indexOf('{');
+                    const fullName = baseEnd > 0 ? key.substring(0, baseEnd) : key;
+                    const suffix = fullName.substring(prefix.length);
+                    routes[routeId][suffix || '_value'] = val;
+                }
+            }
+            return routes;
+        }
+
+        async function fetchPrometheusMetrics(url) {
+            try {
+                const r = await fetch(url);
+                if (!r.ok) return {};
+                return parsePrometheus(await r.text());
+            } catch (e) {
+                console.warn(`Metrics fetch failed: ${url}`, e);
+                return {};
+            }
+        }
+
+        function updateMetric(id, value) {
+            const el = document.getElementById(id);
+            if (el) el.textContent = value !== undefined ? value : '-';
+        }
+
+        function formatBytes(bytes) {
+            if (bytes === undefined || bytes === null) return '-';
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+            if (bytes < 1073741824) return (bytes / 1048576).toFixed(1) + ' MB';
+            return (bytes / 1073741824).toFixed(2) + ' GB';
+        }
+
+        function formatDuration(ms) {
+            if (ms === undefined || ms === null) return '-';
+            if (ms >= 1000) return (ms / 1000).toFixed(1) + 's';
+            return Math.round(ms) + 'ms';
+        }
+
+        // ── Analyzer State ──
+        function setAnalyzerState(state, traceId) {
+            const rect = document.getElementById('node-analyzer-rect');
+            const status = document.getElementById('metric-analyzer-status');
+            if (!rect || !status) return;
+            rect.classList.remove('node-active', 'node-pending', 'node-idle');
+            if (state === 'active') {
+                rect.classList.add('node-active');
+                status.textContent = traceId ? `ACTIVE (${traceId.slice(0, 8)}…)` : 'ACTIVE';
+                status.style.fill = '#198038';
+            } else if (state === 'pending') {
+                rect.classList.add('node-pending');
+                status.textContent = 'PENDING';
+                status.style.fill = '#f1c21b';
+            } else {
+                rect.classList.add('node-idle');
+                status.textContent = 'IDLE';
+                status.style.fill = '#8d8d8d';
+            }
+        }
+
+        // ── Infra Polling (Prometheus only) ──
+        async function pollInfraState() {
+            try {
+                const now = Date.now();
+                const timeDeltaSec = lastPollTime ? Math.max(1, (now - lastPollTime) / 1000) : 1;
+
+                // Fetch all Prometheus endpoints + infra stats in parallel
+                const [correlator, analyzer, ui, analyzerStateRes, cacheStats, queueStats] = await Promise.all([
+                    fetchPrometheusMetrics('/api/metrics/correlator'),
+                    fetchPrometheusMetrics('/api/metrics/analyzer'),
+                    fetchPrometheusMetrics('/api/metrics/ui'),
+                    fetch('/api/analyzer/state').then(r => r.ok ? r.json() : null).catch(() => null),
+                    fetch('/api/infra/cache-stats').then(r => r.ok ? r.json() : null).catch(() => null),
+                    fetch('/api/infra/queue-stats').then(r => r.ok ? r.json() : null).catch(() => null)
+                ]);
+
+                const hasCorrelator = Object.keys(correlator).length > 0;
+                const hasAnalyzer = Object.keys(analyzer).length > 0;
+                const hasUi = Object.keys(ui).length > 0;
+
+                // Total processed (correlator events stored)
+                const eventsStored = hasCorrelator ? (sumMetric(correlator, 'correlator_events_stored') || 0) : 0;
+                updateMetric('metric-total-processed', Math.round(eventsStored));
+
+                // Stores/s rate
+                const lastStored = sumMetric(lastMetricsCache.correlator, 'correlator_events_stored') || 0;
+                const storesRate = lastPollTime && hasCorrelator
+                    ? Math.round(Math.max(0, eventsStored - lastStored) / timeDeltaSec) : 0;
+                updateMetric('metric-cache-stores', storesRate);
+
+                // Errors detected (correlator)
+                const errorsDetected = hasCorrelator ? (sumMetric(correlator, 'correlator_errors_detected') || 0) : 0;
+                updateMetric('metric-errors-detected', Math.round(errorsDetected));
+
+                // Events expired / sent to analyze (correlator)
+                const eventsExpired = hasCorrelator ? (sumMetric(correlator, 'correlator_events_expired') || 0) : 0;
+                updateMetric('metric-events-expired', Math.round(eventsExpired));
+
+                // Interactive analyses triggered (ui-console)
+                const interactiveTriggered = hasUi ? (sumMetric(ui, 'ui_interactive_triggered') || 0) : 0;
+                updateMetric('metric-interactive-triggered', Math.round(interactiveTriggered));
+
+                // Analyses completed (analyzer)
+                const completed = hasAnalyzer ? (sumMetric(analyzer, 'analyzer_analyses_completed') || 0) : 0;
+                const notfound = hasAnalyzer ? (sumMetric(analyzer, 'analyzer_analyses_notfound') || 0) : 0;
+                updateMetric('metric-analyses-completed', Math.round(completed));
+
+                // Results stored (ui-console)
+                const resultsStored = hasUi ? (sumMetric(ui, 'ui_results_stored') || 0) : 0;
+                updateMetric('metric-results-stored', Math.round(resultsStored));
+
+                // Infinispan cache entries
+                if (cacheStats) {
+                    const entries = cacheStats.events >= 0 ? cacheStats.events : '-';
+                    updateMetric('metric-cache-entries', entries >= 0 ? `${entries} entries` : '-');
+                    const pending = cacheStats.eventsToProcess >= 0 ? cacheStats.eventsToProcess : '-';
+                    updateMetric('metric-pending-errors', pending >= 0 ? `${pending} pending` : '-');
+                }
+
+                // Artemis queue depth
+                if (queueStats) {
+                    const errorQueue = queueStats.errorLogs >= 0 ? queueStats.errorLogs : '-';
+                    updateMetric('metric-error-queued', errorQueue);
+                }
+
+                // LLM avg duration (analyzer)
+                const llmSum = hasAnalyzer ? sumMetric(analyzer, 'analyzer_llm_duration_seconds_sum') : undefined;
+                const llmCount = hasAnalyzer ? sumMetric(analyzer, 'analyzer_llm_duration_seconds_count') : undefined;
+                if (llmSum !== undefined && llmCount && llmCount > 0) {
+                    updateMetric('metric-llm-duration', formatDuration((llmSum / llmCount) * 1000));
+                } else {
+                    updateMetric('metric-llm-duration', '-');
+                }
+
+                // Analyzer state from its status API + infrastructure queue depth
+                const analyzerActive = analyzerStateRes?.active === true;
+                const analyzerTraceId = analyzerStateRes?.traceId || '';
+                const pendingInCache = cacheStats?.eventsToProcess > 0;
+                const pendingInQueue = queueStats?.errorLogs > 0;
+
+                if (analyzerActive) {
+                    setAnalyzerState('active', analyzerTraceId);
+                } else if (pendingInCache || pendingInQueue) {
+                    setAnalyzerState('pending');
+                } else {
+                    setAnalyzerState('idle');
+                }
+
+                document.getElementById('infra-poll-status').textContent = 'Polling Active';
+                document.getElementById('infra-poll-status').className = 'bx--tag bx--tag--blue';
+
+                // Cache for next poll
+                lastMetricsCache = { correlator, analyzer, ui };
+                metricsCache = { correlator, analyzer, ui };
+                lastPollTime = now;
+            } catch (error) {
+                console.error('Error polling infra state:', error);
+                document.getElementById('infra-poll-status').textContent = 'Polling Failed';
+                document.getElementById('infra-poll-status').className = 'bx--tag bx--tag--red';
+            }
+        }
+
+        // ── Detail Modals ──
+        const serviceLabels = {
+            correlator: 'Correlator',
+            analyzer: 'Analyzer',
+            ui: 'UI Console'
+        };
+
+        function openModal(service) {
+            const modal = document.getElementById('detail-modal');
+            const title = document.getElementById('modal-title');
+            const body = document.getElementById('modal-body');
+
+            title.textContent = `${serviceLabels[service]} Metrics`;
+            body.innerHTML = renderModalContent(metricsCache[service], service);
+            modal.classList.add('open');
+        }
+
+        function closeModal() {
+            document.getElementById('detail-modal').classList.remove('open');
+        }
+
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+        function renderModalContent(m, service) {
+            if (!m || Object.keys(m).length === 0) {
+                return '<p style="color:#525252;text-align:center;padding:2rem;">Metrics unavailable. Service may not be running.</p>';
+            }
+
+            let html = '';
+
+            // JVM Memory
+            const heapUsed = getMetricWithLabel(m, 'jvm_memory_used_bytes', 'area', 'heap');
+            const heapMax = getMetricWithLabel(m, 'jvm_memory_max_bytes', 'area', 'heap');
+            const nonHeapUsed = getMetricWithLabel(m, 'jvm_memory_used_bytes', 'area', 'nonheap');
+            const heapCommitted = getMetricWithLabel(m, 'jvm_memory_committed_bytes', 'area', 'heap');
+
+            html += '<div class="modal-section">';
+            html += '<div class="modal-section-title">JVM Memory</div>';
+            if (heapUsed !== undefined) {
+                const pct = heapMax && heapMax > 0 ? Math.round((heapUsed / heapMax) * 100) : null;
+                const barClass = pct > 80 ? 'danger' : pct > 60 ? 'warn' : '';
+                html += `<div class="modal-row"><span class="modal-row-label">Heap Used</span><span class="modal-row-value">${formatBytes(heapUsed)}${heapMax > 0 ? ' / ' + formatBytes(heapMax) : ''}</span></div>`;
+                if (pct !== null) {
+                    html += `<div class="modal-bar-container"><div class="modal-bar ${barClass}" style="width:${pct}%"></div></div>`;
+                }
+            }
+            if (heapCommitted !== undefined) {
+                html += `<div class="modal-row"><span class="modal-row-label">Heap Committed</span><span class="modal-row-value">${formatBytes(heapCommitted)}</span></div>`;
+            }
+            if (nonHeapUsed !== undefined) {
+                html += `<div class="modal-row"><span class="modal-row-label">Non-Heap Used</span><span class="modal-row-value">${formatBytes(nonHeapUsed)}</span></div>`;
+            }
+            html += '</div>';
+
+            // GC
+            const gcCount = sumMetricPrefix(m, 'jvm_gc_pause_seconds_count');
+            const gcSum = sumMetricPrefix(m, 'jvm_gc_pause_seconds_sum');
+            if (gcCount !== undefined) {
+                html += '<div class="modal-section">';
+                html += '<div class="modal-section-title">Garbage Collection</div>';
+                html += `<div class="modal-row"><span class="modal-row-label">GC Pauses</span><span class="modal-row-value">${Math.round(gcCount)}</span></div>`;
+                if (gcSum !== undefined) {
+                    html += `<div class="modal-row"><span class="modal-row-label">Total GC Time</span><span class="modal-row-value">${formatDuration(gcSum * 1000)}</span></div>`;
+                    if (gcCount > 0) {
+                        html += `<div class="modal-row"><span class="modal-row-label">Avg GC Pause</span><span class="modal-row-value">${formatDuration((gcSum / gcCount) * 1000)}</span></div>`;
+                    }
+                }
+                html += '</div>';
+            }
+
+            // CPU
+            const cpuUsage = getMetric(m, 'process_cpu_usage') ?? getMetric(m, 'system_cpu_usage');
+            const cpuCount = getMetric(m, 'system_cpu_count');
+            if (cpuUsage !== undefined || cpuCount !== undefined) {
+                html += '<div class="modal-section">';
+                html += '<div class="modal-section-title">CPU</div>';
+                if (cpuUsage !== undefined) {
+                    const pct = Math.round(cpuUsage * 100);
+                    const barClass = pct > 80 ? 'danger' : pct > 50 ? 'warn' : '';
+                    html += `<div class="modal-row"><span class="modal-row-label">Process CPU</span><span class="modal-row-value">${pct}%</span></div>`;
+                    html += `<div class="modal-bar-container"><div class="modal-bar ${barClass}" style="width:${Math.min(pct, 100)}%"></div></div>`;
+                }
+                if (cpuCount !== undefined) {
+                    html += `<div class="modal-row"><span class="modal-row-label">Available Processors</span><span class="modal-row-value">${cpuCount}</span></div>`;
+                }
+                html += '</div>';
+            }
+
+            // Routes
+            const routePolicy = getMetricsByRoute(m, 'camel_route_policy_seconds');
+            const routeIds = Object.keys(routePolicy);
+            if (routeIds.length > 0) {
+                html += '<div class="modal-section">';
+                html += '<div class="modal-section-title">Camel Routes</div>';
+                for (const routeId of routeIds.sort()) {
+                    const r = routePolicy[routeId];
+                    const count = r['_count'] || 0;
+                    const sum = r['_sum'] || 0;
+                    const avg = count > 0 ? formatDuration((sum / count) * 1000) : '-';
+                    html += `<div class="modal-row"><span class="modal-row-label">${escapeHtml(routeId)}</span><span class="modal-row-value">${Math.round(count)} exchanges (avg ${avg})</span></div>`;
+                }
+                html += '</div>';
+            }
+
+            // Custom business metrics
+            const businessMetrics = getBusinessMetrics(m, service);
+            if (businessMetrics.length > 0) {
+                html += '<div class="modal-section">';
+                html += '<div class="modal-section-title">Business Metrics</div>';
+                for (const { label, value } of businessMetrics) {
+                    html += `<div class="modal-row"><span class="modal-row-label">${label}</span><span class="modal-row-value">${value}</span></div>`;
+                }
+                html += '</div>';
+            }
+
+            return html;
+        }
+
+        function getMetricWithLabel(metrics, name, labelKey, labelValue) {
+            // Sum all matching series with the given label
+            let total = 0, found = false;
+            for (const [key, val] of Object.entries(metrics)) {
+                if ((key.startsWith(name + '{') || key.startsWith(name + '_bytes{') || key === name) &&
+                    key.includes(`${labelKey}="${labelValue}"`)) {
+                    total += val;
+                    found = true;
+                }
+            }
+            return found ? total : undefined;
+        }
+
+        function sumMetricPrefix(metrics, prefix) {
+            let total = 0, found = false;
+            for (const [key, val] of Object.entries(metrics)) {
+                const base = key.split('{')[0];
+                if (base === prefix) {
+                    total += val;
+                    found = true;
+                }
+            }
+            return found ? total : undefined;
+        }
+
+        function getBusinessMetrics(m, service) {
+            const results = [];
+            if (service === 'correlator') {
+                const stored = sumMetric(m, 'correlator_events_stored');
+                if (stored !== undefined) results.push({ label: 'Events Stored', value: Math.round(stored) });
+                const errors = sumMetric(m, 'correlator_errors_detected');
+                if (errors !== undefined) results.push({ label: 'Errors Detected', value: Math.round(errors) });
+                const expired = sumMetric(m, 'correlator_events_expired');
+                if (expired !== undefined) results.push({ label: 'Events Expired', value: Math.round(expired) });
+            } else if (service === 'analyzer') {
+                const completed = sumMetric(m, 'analyzer_analyses_completed');
+                if (completed !== undefined) results.push({ label: 'Analyses Completed', value: Math.round(completed) });
+                const notfound = sumMetric(m, 'analyzer_analyses_notfound');
+                if (notfound !== undefined) results.push({ label: 'Analyses Not Found', value: Math.round(notfound) });
+                const llmSum = sumMetric(m, 'analyzer_llm_duration_seconds_sum');
+                const llmCount = sumMetric(m, 'analyzer_llm_duration_seconds_count');
+                if (llmSum !== undefined && llmCount > 0) {
+                    results.push({ label: 'Avg LLM Latency', value: formatDuration((llmSum / llmCount) * 1000) });
+                    results.push({ label: 'Total LLM Time', value: formatDuration(llmSum * 1000) });
+                }
+            } else if (service === 'ui') {
+                const stored = sumMetric(m, 'ui_results_stored');
+                if (stored !== undefined) results.push({ label: 'Results Stored', value: Math.round(stored) });
+            }
+            return results;
+        }
+
+        // ── Interactive Analysis ──
+        async function openInteractiveAnalysis(traceId) {
+            const contentPanel = document.getElementById('contentPanel');
+
+            contentPanel.innerHTML = `
+                <div class="bx--tile" style="padding: 0;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 1.5rem; border-bottom: 1px solid #e0e0e0;">
+                        <h3 class="bx--type-productive-heading-03">Interactive Analysis: ${escapeHtml(traceId)}</h3>
+                        <button class="bx--btn bx--btn--ghost bx--btn--sm" onclick="loadTraceContent('${escapeHtml(traceId)}')">Back</button>
+                    </div>
+                    <div class="interactive-container">
+                        <div class="bx--loading bx--loading--small">
+                            <svg class="bx--loading__svg" viewBox="0 0 100 100">
+                                <circle class="bx--loading__stroke" cx="50%" cy="50%" r="44"></circle>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            let currentPrompt = '';
+            let existingInteractive = null;
+            try {
+                const [promptRes, itRes] = await Promise.all([
+                    fetch(`${API_BASE}/${traceId}/prompt`),
+                    fetch(`${API_BASE}/${traceId}/interactive`)
+                ]);
+                if (promptRes.ok) {
+                    currentPrompt = await promptRes.text();
+                    // Strip the prefixed analysis result if it was saved with the prompt
+                    if (currentTraceContent && currentPrompt.startsWith(currentTraceContent)) {
+                        currentPrompt = currentPrompt.substring(currentTraceContent.length).replace(/^\n+/, '');
+                    }
+                }
+                if (itRes.ok) {
+                    const itData = await itRes.json();
+                    existingInteractive = itData.content;
+                }
+            } catch (e) {
+                console.error('Failed to fetch prompt/interactive:', e);
+            }
+
+            const hasInteractive = existingInteractive !== null;
+
+            contentPanel.innerHTML = `
+                <div class="bx--tile" style="padding: 0;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 1.5rem; border-bottom: 1px solid #e0e0e0;">
+                        <h3 class="bx--type-productive-heading-03">Interactive Analysis: ${escapeHtml(traceId)}</h3>
+                        <button class="bx--btn bx--btn--ghost bx--btn--sm" onclick="loadTraceContent('${escapeHtml(traceId)}')">Back</button>
+                    </div>
+                    <div class="interactive-container">
+                        <div class="interactive-section">
+                            <label>Current Analysis Result</label>
+                            <div class="interactive-result">${escapeHtml(currentTraceContent)}</div>
+                        </div>
+                        <div class="interactive-section">
+                            <label>Prompt</label>
+                            <textarea id="interactive-prompt" class="interactive-textarea">${escapeHtml(currentPrompt)}</textarea>
+                        </div>
+                        <div class="interactive-section">
+                            <button id="analyze-btn" class="bx--btn bx--btn--primary bx--btn--sm" onclick="runInteractiveAnalysis('${escapeHtml(traceId)}')">Analyze</button>
+                        </div>
+                        <div id="interactive-result-section" class="interactive-section" style="${hasInteractive ? '' : 'display:none;'}">
+                            <label>Interactive Analysis Result</label>
+                            <div id="interactive-result-content" class="interactive-result">${hasInteractive ? escapeHtml(existingInteractive) : ''}</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        async function runInteractiveAnalysis(traceId) {
+            const btn = document.getElementById('analyze-btn');
+            const resultSection = document.getElementById('interactive-result-section');
+            const resultContent = document.getElementById('interactive-result-content');
+            const promptText = document.getElementById('interactive-prompt').value;
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading-spinner"></span>Analyzing...';
+            resultSection.style.display = 'block';
+            resultContent.textContent = 'Waiting for analysis result...';
+
+            try {
+                const fullPrompt = currentTraceContent + '\n\n' + promptText;
+                await fetch(`${API_BASE}/${traceId}/prompt`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: fullPrompt
+                });
+
+                await fetch(`${API_BASE}/${traceId}/interactive`, {
+                    method: 'POST'
+                });
+
+                let attempts = 0;
+                const maxAttempts = 200;
+                const pollInterval = 3000;
+
+                const poll = setInterval(async () => {
+                    attempts++;
+                    try {
+                        const res = await fetch(`${API_BASE}/${traceId}/interactive`);
+                        if (res.ok) {
+                            const data = await res.json();
+                            clearInterval(poll);
+                            resultContent.textContent = data.content;
+                            btn.disabled = false;
+                            btn.innerHTML = 'Analyze';
+                        }
+                    } catch (e) {
+                        // continue polling
+                    }
+                    if (attempts >= maxAttempts) {
+                        clearInterval(poll);
+                        resultContent.textContent = 'Analysis timed out. Please try again.';
+                        btn.disabled = false;
+                        btn.innerHTML = 'Analyze';
+                    }
+                }, pollInterval);
+
+            } catch (error) {
+                console.error('Interactive analysis failed:', error);
+                resultContent.textContent = 'Error: ' + error.message;
+                btn.disabled = false;
+                btn.innerHTML = 'Analyze';
+            }
+        }
+
+        // ── Init ──
+        document.getElementById('contentPanel').innerHTML = `
+            <div class="empty-state">
+                <img src="https://raw.githubusercontent.com/apache/camel/refs/heads/main/docs/img/logo-d.svg" alt="Apache Camel" class="empty-state-icon">
+                <h3 class="bx--type-productive-heading-03" style="margin-bottom: 0.5rem;">Welcome to Smart Log Analyzer</h3>
+                <p class="bx--type-body-short-01">Select a trace from the sidebar to view its analysis</p>
+            </div>
+        `;
+
+        loadTraces();
+        pollInfraState();
+
+        setInterval(loadTraces, 15000);
+        setInterval(pollInfraState, 3000);
+    </script>
+</body>
+</html>

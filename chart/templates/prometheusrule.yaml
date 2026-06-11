@@ -1,0 +1,24 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: smart-log-analyzer
+  labels:
+    app.kubernetes.io/part-of: smart-log-analyzer
+spec:
+  groups:
+    - name: smart-log-analyzer.rules
+      rules:
+        - alert: ErrorDetected
+          expr: increase(correlator_errors_detected_total[1m]) > 0
+          labels:
+            severity: warning
+          annotations:
+            summary: "Microservice error detected"
+            description: 'The correlator has detected {{ "{{ $value | printf \"%.0f\" }}" }} new ERROR-severity events in the last minute.'
+        - alert: AnalysisCompleted
+          expr: increase(analyzer_analyses_completed_total[1m]) > 0
+          labels:
+            severity: info
+          annotations:
+            summary: "Error analysis completed"
+            description: 'The analyzer has completed {{ "{{ $value | printf \"%.0f\" }}" }} LLM root cause analyses in the last minute.'

@@ -1,0 +1,62 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: artemis
+  labels:
+    app: artemis
+spec:
+  ports:
+    - port: 61616
+      name: core
+    - port: 5672
+      name: amqp
+    - port: 8161
+      name: console
+  selector:
+    app: artemis
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: artemis
+  labels:
+    app: artemis
+    app.kubernetes.io/part-of: smart-log-analyzer
+    app.openshift.io/runtime: amq
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: artemis
+  template:
+    metadata:
+      labels:
+        app: artemis
+    spec:
+      containers:
+        - name: artemis
+          image: quay.io/artemiscloud/activemq-artemis-broker:artemis.2.38.0
+          ports:
+            - containerPort: 61616
+            - containerPort: 5672
+            - containerPort: 8161
+          env:
+            - name: AMQ_USER
+              valueFrom:
+                secretKeyRef:
+                  name: infra-accounts
+                  key: AMQ_USERNAME
+            - name: AMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: infra-accounts
+                  key: AMQ_PASSWORD
+            - name: AMQ_REQUIRE_LOGIN
+              value: "true"
+          resources:
+            requests:
+              memory: 256Mi
+              cpu: 250m
+            limits:
+              memory: 512Mi

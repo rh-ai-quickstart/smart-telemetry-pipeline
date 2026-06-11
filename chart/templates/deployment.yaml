@@ -1,0 +1,129 @@
+{{- range $name, $component := .Values.components }}
+{{- if $component.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels:
+    app: {{ $name }}
+    app.kubernetes.io/name: {{ $name }}
+    app.kubernetes.io/part-of: smart-log-analyzer
+    app.openshift.io/runtime: camel
+    camel.apache.org/app: {{ $name }}
+  annotations:
+    image.openshift.io/triggers: >-
+      [{"from":{"kind":"ImageStreamTag","name":"{{ $name }}:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"{{ $name }}\")].image"}]
+spec:
+  replicas: {{ $component.replicas }}
+  strategy:
+    type: {{ $component.strategy }}
+  selector:
+    matchLabels:
+      app: {{ $name }}
+  template:
+    metadata:
+      labels:
+        app: {{ $name }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") $ | sha256sum }}
+    spec:
+      {{- if and $component.serviceCa $component.serviceCa.enabled }}
+      initContainers:
+        - name: build-truststore
+          image: {{ $.Values.imageRegistry }}/{{ $.Values.namespace }}/{{ $name }}:latest
+          command: ['sh', '-c']
+          args:
+            - |
+              cat "$JAVA_HOME/lib/security/cacerts" > /tmp/truststore/truststore.jks
+              chmod 664 /tmp/truststore/truststore.jks
+              if [ -f /service-ca/service-ca.crt ]; then
+                keytool -import -trustcacerts -alias openshift-service-ca \
+                  -file /service-ca/service-ca.crt \
+                  -keystore /tmp/truststore/truststore.jks \
+                  -storepass changeit -noprompt
+              fi
+          volumeMounts:
+            - name: truststore
+              mountPath: /tmp/truststore
+            - name: service-ca
+              mountPath: /service-ca
+      {{- end }}
+      containers:
+        - name: {{ $name }}
+          image: {{ $.Values.imageRegistry }}/{{ $.Values.namespace }}/{{ $name }}:latest
+          resources:
+            limits:
+              memory: {{ $component.memoryLimit }}
+          startupProbe:
+            httpGet:
+              path: /observe/health/started
+              port: 9876
+            failureThreshold: 30
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /observe/health/live
+              port: 9876
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /observe/health/ready
+              port: 9876
+            periodSeconds: 10
+            failureThreshold: 3
+          envFrom:
+            - configMapRef:
+                name: infra-endpoints
+            - configMapRef:
+                name: otel-infra-endpoints
+            - secretRef:
+                name: infra-accounts
+            {{- if $component.secrets }}
+            {{- range $component.secrets }}
+            - secretRef:
+                name: {{ . }}
+            {{- end }}
+            {{- end }}
+          env:
+            {{- if or $.Values.nettyWorkaround (and $component.serviceCa $component.serviceCa.enabled) }}
+            - name: JAVA_OPTS_APPEND
+              value: "{{ if $.Values.nettyWorkaround }}{{ $.Values.javaOptsAppend }}{{ end }}{{ if and $component.serviceCa $component.serviceCa.enabled }} -Djavax.net.ssl.trustStore=/tmp/truststore/truststore.jks -Djavax.net.ssl.trustStorePassword=changeit{{ end }}"
+            {{- end }}
+            {{- if $component.extraEnv }}
+            {{- toYaml $component.extraEnv | nindent 12 }}
+            {{- end }}
+          volumeMounts:
+            - name: app-config
+              mountPath: /deployments/config
+            {{- if $component.storage }}
+            {{- if $component.storage.mountPath }}
+            - name: app-storage
+              mountPath: {{ $component.storage.mountPath }}
+            {{- end }}
+            {{- end }}
+            {{- if and $component.serviceCa $component.serviceCa.enabled }}
+            - name: truststore
+              mountPath: /tmp/truststore
+            {{- end }}
+      volumes:
+        - name: app-config
+          configMap:
+            name: {{ $name }}-config
+        {{- if $component.storage }}
+        {{- if $component.storage.mountPath }}
+        - name: app-storage
+          persistentVolumeClaim:
+            claimName: {{ $name }}-storage
+        {{- end }}
+        {{- end }}
+        {{- if and $component.serviceCa $component.serviceCa.enabled }}
+        - name: truststore
+          emptyDir: {}
+        - name: service-ca
+          configMap:
+            name: {{ $component.serviceCa.configMap }}
+        {{- end }}
+{{- end }}
+{{- end }}

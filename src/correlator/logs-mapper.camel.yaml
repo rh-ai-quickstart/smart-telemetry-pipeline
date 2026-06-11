@@ -1,0 +1,54 @@
+- route:
+    id: log-consumer
+    description: Consume Kafka logs
+    from:
+      uri: kafka:{{camel.kafka.topic.logs}}
+      parameters:
+        autoOffsetReset: earliest
+        groupId: correlator
+      steps:
+        - log:
+            description: Log received record
+            loggingLevel: DEBUG
+            message: Received log from Kafka \n ${body}
+        - split:
+            description: Split log records
+            id: split-logs
+            expression:
+              jsonpath:
+                expression: $.resourceLogs[*].scopeLogs[*].logRecords[*]
+                writeAsString: true
+            steps:
+              - setHeader:
+                  description: Save log body
+                  id: set-logs-header
+                  expression:
+                    simple:
+                      expression: ${body}
+                  name: logs
+              - setBody:
+                  description: Set dummy XML
+                  id: set-dummy-xml
+                  expression:
+                    constant:
+                      expression: <dummy/>
+              - step:
+                  description: Map log data
+                  id: kaoto-datamapper-4a94acc3
+                  steps:
+                    - to:
+                        description: Apply XSLT mapping
+                        id: kaoto-datamapper-xslt
+                        uri: xslt-saxon:kaoto-datamapper-4a94acc3.xsl
+                        parameters:
+                          allowStAX: true
+              - log:
+                  description: Log mapped output
+                  loggingLevel: DEBUG
+                  message: "Mapped output: ${body}"
+              - to:
+                  description: Send to store
+                  id: to-2266
+                  uri: direct
+                  parameters:
+                    name: store

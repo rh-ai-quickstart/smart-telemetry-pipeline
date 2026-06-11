@@ -1,0 +1,41 @@
+namespace: slog-analyzer
+
+imageRegistry: image-registry.openshift-image-registry.svc:5000
+
+components:
+  correlator:
+    enabled: true
+    replicas: 1
+    memoryLimit: 512Mi
+    strategy: RollingUpdate
+    expose: false
+    storage: {}
+
+  analyzer:
+    enabled: true
+    replicas: 1
+    memoryLimit: 512Mi
+    strategy: RollingUpdate
+    expose: false
+    storage: {}
+    secrets:
+      - openai
+    serviceCa:
+      enabled: true
+      configMap: service-ca-bundle
+
+  ui-console:
+    enabled: true
+    replicas: 1
+    memoryLimit: 512Mi
+    strategy: Recreate
+    expose: true
+    storage:
+      mountPath: /storage
+      size: 1Gi
+    extraEnv:
+      - name: ANALYZER_STORAGE_ROOT
+        value: /storage
+
+nettyWorkaround: true
+javaOptsAppend: "-Dio.netty.transport.noNative=true"

@@ -1,0 +1,26 @@
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  generateName: build-run-
+spec:
+  pipelineRef:
+    name: build
+  params:
+    - name: repo-url
+      value: https://github.com/apache/camel-jbang-examples.git
+    - name: repo-revision
+      value: main
+    - name: app-path
+      value: smart-log-analyzer/correlator
+    - name: app-name
+      value: correlator
+    - name: namespace
+      value: slog-analyzer
+    - name: camel-launcher-version
+      value: "4.18.1.redhat-00016"
+    - name: gav
+      value: "com.example:correlator:1.0.0"
+  workspaces:
+    - name: shared-workspace
+      persistentVolumeClaim:
+        claimName: maven-repo
