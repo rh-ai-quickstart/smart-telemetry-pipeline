@@ -7,7 +7,7 @@ spec:
     - name: repo-url
       type: string
       description: Git repository URL
-      default: "https://github.com/mcarlett/smart-telemetry-pipeline.git"
+      default: "https://github.com/rh-ai-quickstart/smart-telemetry-pipeline.git"
     - name: repo-revision
       type: string
       description: Git revision (branch, tag, or commit SHA)
