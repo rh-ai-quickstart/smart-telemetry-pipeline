@@ -46,6 +46,7 @@
             description: List trace files
             groovy: |
               import java.nio.file.*
+              import java.nio.file.attribute.BasicFileAttributes
               try {
                 def path = Paths.get(exchange.getVariable('storagePath'))
                 if (!Files.exists(path)) {
@@ -54,7 +55,8 @@
                 return Files.list(path)
                   .filter(Files::isRegularFile)
                   .filter(p -> p.getFileName().toString().endsWith('.txt'))
-                .filter(p -> !p.getFileName().toString().endsWith('-it.txt'))
+                  .filter(p -> !p.getFileName().toString().endsWith('-it.txt'))
+                  .sorted((p1, p2) -> Files.readAttributes(p2, BasicFileAttributes.class).creationTime().compareTo(Files.readAttributes(p1, BasicFileAttributes.class).creationTime()))
                   .map(p -> {
                     def filename = p.getFileName().toString()
                     def traceId = filename.substring(0, filename.lastIndexOf('.txt'))
