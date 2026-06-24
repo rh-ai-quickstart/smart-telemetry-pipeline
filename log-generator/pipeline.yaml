@@ -148,6 +148,7 @@ spec:
               otel.traces.exporter=otlp
               otel.metrics.exporter=none
               otel.logs.exporter=otlp
+              otel.instrumentation.apache-httpclient.enabled=false
               AGENT
 
               # Dockerfile
