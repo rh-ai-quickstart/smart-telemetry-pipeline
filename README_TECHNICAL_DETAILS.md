@@ -1,0 +1,111 @@
+# Technical Details
+
+## Component architecture
+
+The system consists of three Apache Camel applications that form an automated error analysis pipeline:
+
+- The **correlator** consumes OpenTelemetry logs and spans from Kafka, correlates them by traceId in Infinispan, and detects errors. When cached events expire (after a configurable TTL), the traceId is forwarded to a JMS queue for analysis.
+
+- The **analyzer** picks up traceIds from the JMS queue, retrieves the correlated events from Infinispan, sends them to an LLM (OpenAI-compatible API) for root cause analysis, and publishes the result to an output queue.
+
+- The **ui-console** consumes analysis results, stores them as files, and exposes a REST API and web UI for listing results, viewing trace details, and triggering interactive re-analysis with custom prompts.
+
+### Data flow
+
+```mermaid
+graph TB
+    subgraph "External"
+        APPS[Applications<br/>with OTel instrumentation]
+    end
+
+    subgraph "OpenShift AI"
+        LLM[Granite LLM<br/>OpenAI-compatible API]
+    end
+
+    subgraph "Infrastructure"
+        OTEL[OTel Collector<br/>OTLP receiver<br/>ports 4317/4318]
+        KAFKA[Kafka<br/>otlp_logs / otlp_spans<br/>port 9092]
+        AMQ[AMQ Broker<br/>Artemis<br/>port 61616]
+        ISPN[Infinispan<br/>Data Grid<br/>port 11222]
+    end
+
+    subgraph "Application Components"
+        CORRELATOR[Correlator]
+        ANALYZER[Analyzer]
+        UI_CONSOLE[UI Console<br/>port 8080]
+        FS[File Storage<br/>PVC]
+    end
+
+    %% OTel pipeline
+    APPS -- "OTLP logs & traces" --> OTEL
+    OTEL -- "export to Kafka" --> KAFKA
+
+    %% Correlator
+    KAFKA -- "consume logs & spans" --> CORRELATOR
+    CORRELATOR -- "store events by traceId<br/>(caches: events,<br/>events-to-process)" --> ISPN
+    CORRELATOR -- "send traceId on error<br/>(queue: error-logs)" --> AMQ
+
+    %% Analyzer
+    AMQ -- "consume traceIds<br/>(queue: error-logs)" --> ANALYZER
+    ANALYZER -- "retrieve events by traceId<br/>(cache: events)" --> ISPN
+    ANALYZER -- "root cause analysis" --> LLM
+    ANALYZER -- "send analysis result<br/>(queue: analysis-result)" --> AMQ
+
+    %% UI Console
+    AMQ -- "consume results<br/>(queue: analysis-result)" --> UI_CONSOLE
+    UI_CONSOLE -- "store results as files" --> FS
+    UI_CONSOLE -- "query cache stats" --> ISPN
+    UI_CONSOLE -- "query queue stats" --> AMQ
+    UI_CONSOLE -- "proxy metrics" --> CORRELATOR
+    UI_CONSOLE -- "proxy metrics + state" --> ANALYZER
+```
+
+### Analyzer metrics
+
+The analyzer exposes detailed JVM, Camel route, and business metrics through its metrics endpoint. The UI Console proxies these and displays them in a dedicated panel.
+
+![Analyzer metrics panel showing JVM memory, CPU, Camel route statistics, and business metrics](docs/images/analyzer_details.png)
+
+## Build pipeline
+
+The `build` pipeline converts Camel JBang source code into container images deployed on OpenShift:
+
+```mermaid
+graph LR
+    subgraph "build-apps"
+        direction TB
+        BA_C[build correlator]
+        BA_A[build analyzer]
+        BA_U[build ui-console]
+    end
+
+    subgraph "build pipeline (per component)"
+        direction LR
+        S0[Build Camel Launcher<br/>download JAR + buildah] --> S1[Git Clone<br/>clone source repo]
+        S1 --> S2[Camel Export<br/>export to Quarkus project]
+        S2 --> S3[Maven Build<br/>compile and package]
+        S3 --> S4[Prepare Dockerfile<br/>write Dockerfile]
+        S4 --> S5[Build Image<br/>buildah build + push]
+    end
+
+    BA_C --> S1
+    BA_A --> S1
+    BA_U --> S1
+    S5 --> REG[OpenShift<br/>Internal Registry]
+    REG -- "image trigger" --> DEP[Deployment<br/>rollout]
+```
+
+The **Build Camel Launcher** step downloads the `camel-launcher` JAR from Maven Central or Red Hat GA repository (via `mvn dependency:copy`) and builds it into a container image pushed to the OpenShift internal registry. The version is configurable via the `camel-launcher-version` pipeline parameter (default: `4.18.1.redhat-00016`). The Quarkus platform version used during `camel export` is configurable via the `runtime-version` parameter (default: `3.33.2.redhat-00002`). The **Camel Export** step runs `camel export --runtime=quarkus` using the internally-built camel-launcher image to convert the Camel JBang application into a standard Quarkus Maven project. The **Maven Build** step compiles it into a Quarkus fast-jar. The **Build Image** step uses Buildah to create the container image and push it to the OpenShift internal registry. The `image.openshift.io/triggers` annotation on the Deployment automatically triggers a rollout when a new image is pushed.
+
+![OpenShift Pipelines view showing the build-analyzer pipeline run with all tasks](docs/images/build_analyzer_pipeline.png)
+
+## Kaoto DataMapper
+
+The correlator uses [Kaoto](https://kaoto.io/) DataMapper to transform raw OpenTelemetry JSON payloads into the correlated event format stored in Infinispan. Two XSLT transformations are generated by the Kaoto visual editor:
+
+- **Log mapping** (`kaoto-datamapper-4a94acc3.xsl`) — transforms OpenTelemetry log records (`otel-log-record-schema.json`) into the correlated log format (`correlated-log-schema.json`)
+- **Trace mapping** (`kaoto-datamapper-8f5bb2dd.xsl`) — transforms OpenTelemetry spans (`otel-span-schema.json`) into the correlated trace format (`correlated-trace-schema.json`)
+
+The Kaoto DataMapper provides a visual drag-and-drop interface for defining field mappings between the source and target JSON schemas, generating the underlying XSLT automatically.
+
+![Kaoto DataMapper showing the visual mapping between OpenTelemetry trace fields and the correlated trace schema](docs/images/OTEL_traces_data_mapper.png)
