@@ -20,22 +20,22 @@ The system consists of three Apache Camel applications deployed on Red Hat® Ope
 
 ### Architecture diagrams
 
-![OpenShift topology view showing all deployed components](docs/images/openshift_topology.png)
+![Architecture diagram showing the three-tier observability pipeline with Kafka message broker, Camel correlator and analyzer services, and UI console deployed on OpenShift](docs/images/openshift_topology.png)
 
-![Infrastructure state dashboard showing the end-to-end pipeline flow with live metrics](docs/images/infra_overview.png)
+![End-to-end data flow diagram illustrating telemetry ingestion through OpenTelemetry collector, event correlation in Infinispan, AI analysis via Granite LLM, and visualization in the web console](docs/images/infra_overview.png)
 
 ## Requirements
 
 ### Minimum hardware requirements
 
-No dedicated hardware is required. The application runs entirely within the Red Hat® Developer Sandbox, which provides shared compute resources.
+No dedicated hardware is required. The application runs entirely within the Red Hat Developer Sandbox, which provides shared compute resources.
 
 ### Minimum software requirements
 
 | Component | Version | Notes |
 |---|---|---|
 | [Red Hat Developer Sandbox](https://developers.redhat.com/developer-sandbox) | OpenShift 4.x with Pipelines | Free hosted cluster with pre-installed Tekton |
-| Red Hat® OpenShift® AI shared models | Granite LLM | Activated via the sandbox landing page |
+| Red Hat OpenShift AI shared models | Granite LLM | Activated via the sandbox landing page |
 | `oc` (OpenShift CLI) | 4.x | Download from the OpenShift web console (**?** > **Command line tools**) or [mirror.openshift.com](https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/) |
 | `helm` | 3.x | [Install guide](https://helm.sh/docs/intro/install/) |
 | `tkn` | latest | [Install guide](https://tekton.dev/docs/cli/). Useful for monitoring pipeline runs |
@@ -130,8 +130,8 @@ For manual step-by-step deployment and deletion, see the [Manual Deployment Guid
 
 ## References
 
-- [Red Hat® build of Apache Camel](https://developers.redhat.com/products/red-hat-build-of-apache-camel)
-- [Red Hat® Application Foundations](https://www.redhat.com/en/products/application-foundations)
+- [Red Hat build of Apache Camel](https://developers.redhat.com/products/red-hat-build-of-apache-camel)
+- [Red Hat Application Foundations](https://www.redhat.com/en/products/application-foundations)
 
 ### Additional documentation
 
@@ -143,6 +143,6 @@ For manual step-by-step deployment and deletion, see the [Manual Deployment Guid
 ## Tags
 
 - **Industry:** Media and IT services
-- **Product:** Red Hat® OpenShift® AI + Red Hat® Application Foundations
+- **Product:** Red Hat OpenShift AI + Red Hat Application Foundations
 - **Use case:** Observability, automation, AI-assisted diagnostics
 - **Contributor org:** Red Hat
