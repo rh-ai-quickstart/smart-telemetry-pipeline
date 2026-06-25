@@ -16,7 +16,7 @@ An intelligent observability pipeline that automatically detects microservice er
 
 Site Reliability Engineers spend significant time manually sifting through logs and traces to diagnose production incidents. In complex microservice architectures, a single user request can span dozens of services, making root cause analysis slow and error-prone. This pipeline automates that investigation: it continuously ingests OpenTelemetry data, detects errors, correlates related signals by trace ID, and sends the correlated context to an LLM for immediate root cause analysis delivering actionable insights in seconds.
 
-The system consists of three Apache Camel applications deployed on OpenShift. The **correlator** consumes logs and traces from Kafka and groups them by trace ID in Infinispan. The **analyzer** retrieves correlated events and sends them to a Granite LLM for root cause analysis. The **UI console** stores results and provides a web interface for reviewing analyses and triggering interactive re-analysis with custom prompts.
+The system consists of three Apache Camel applications deployed on Red Hat® OpenShift®. The **correlator** consumes logs and traces from Kafka and groups them by trace ID in Infinispan. The **analyzer** retrieves correlated events and sends them to a Granite LLM for root cause analysis. The **UI console** stores results and provides a web interface for reviewing analyses and triggering interactive re-analysis with custom prompts.
 
 ### Architecture diagrams
 
@@ -28,14 +28,14 @@ The system consists of three Apache Camel applications deployed on OpenShift. Th
 
 ### Minimum hardware requirements
 
-No dedicated hardware is required. The application runs entirely within the Red Hat Developer Sandbox, which provides shared compute resources.
+No dedicated hardware is required. The application runs entirely within the Red Hat® Developer Sandbox, which provides shared compute resources.
 
 ### Minimum software requirements
 
 | Component | Version | Notes |
 |---|---|---|
 | [Red Hat Developer Sandbox](https://developers.redhat.com/developer-sandbox) | OpenShift 4.x with Pipelines | Free hosted cluster with pre-installed Tekton |
-| OpenShift AI shared models | Granite LLM | Activated via the sandbox landing page |
+| Red Hat® OpenShift® AI shared models | Granite LLM | Activated via the sandbox landing page |
 | `oc` (OpenShift CLI) | 4.x | Download from the OpenShift web console (**?** > **Command line tools**) or [mirror.openshift.com](https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/) |
 | `helm` | 3.x | [Install guide](https://helm.sh/docs/intro/install/) |
 | `tkn` | latest | [Install guide](https://tekton.dev/docs/cli/). Useful for monitoring pipeline runs |
@@ -130,8 +130,8 @@ For manual step-by-step deployment and deletion, see the [Manual Deployment Guid
 
 ## References
 
-- [Red Hat build of Apache Camel](https://developers.redhat.com/products/red-hat-build-of-apache-camel)
-- [Red Hat Application Foundations](https://www.redhat.com/en/products/application-foundations)
+- [Red Hat® build of Apache Camel](https://developers.redhat.com/products/red-hat-build-of-apache-camel)
+- [Red Hat® Application Foundations](https://www.redhat.com/en/products/application-foundations)
 
 ### Additional documentation
 
@@ -142,7 +142,7 @@ For manual step-by-step deployment and deletion, see the [Manual Deployment Guid
 
 ## Tags
 
-- **Industry**: Media and IT services
-- **Product**: Red Hat OpenShift AI + Red Hat Application Foundations
-- **Use case**: Observability, automation, AI-assisted diagnostics
-- **Contributor org**: Red Hat
+- **Industry:** Media and IT services
+- **Product:** Red Hat® OpenShift® AI + Red Hat® Application Foundations
+- **Use case:** Observability, automation, AI-assisted diagnostics
+- **Contributor org:** Red Hat
