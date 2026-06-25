@@ -108,7 +108,9 @@ Deploy the log generator to produce simulated telemetry (orders with a 30% failu
 ./log-generator/run.sh
 ```
 
-Open the UI Console to see AI-generated root cause analyses appearing for the detected errors.
+Open the UI Console to see AI-generated root cause analyses appearing for the detected errors. Click on a trace to view the detailed analysis for correlated traces and logs, and use interactive prompting to ask follow-up questions about the initial analysis.
+
+![Trace analysis detail view with interactive prompting on correlated traces and logs](docs/images/trace_analysis.jpeg)
 
 To stop generating test data:
 
