@@ -1,0 +1,58 @@
+{
+	"kaoto-datamapper-4a94acc3": {
+		"sourceBody": {
+			"type": "Primitive",
+			"filePath": [],
+			"fieldTypeOverrides": []
+		},
+		"sourceParameters": {
+			"logs": {
+				"type": "JSON Schema",
+				"filePath": [
+					"src/correlator/otel-log-record-schema.json"
+				],
+				"fieldTypeOverrides": []
+			}
+		},
+		"targetBody": {
+			"type": "JSON Schema",
+			"filePath": [
+				"src/correlator/correlated-log-schema.json"
+			],
+			"fieldTypeOverrides": []
+		},
+		"xsltPath": "kaoto-datamapper-4a94acc3.xsl",
+		"namespaceMap": {
+			"xs": "http://www.w3.org/2001/XMLSchema",
+			"fn": "http://www.w3.org/2005/xpath-functions"
+		}
+	},
+	"kaoto-datamapper-8f5bb2dd": {
+		"sourceBody": {
+			"type": "Primitive",
+			"filePath": [],
+			"fieldTypeOverrides": []
+		},
+		"sourceParameters": {
+			"traces": {
+				"type": "JSON Schema",
+				"filePath": [
+					"src/correlator/otel-span-schema.json"
+				],
+				"fieldTypeOverrides": []
+			}
+		},
+		"targetBody": {
+			"type": "JSON Schema",
+			"filePath": [
+				"src/correlator/correlated-trace-schema.json"
+			],
+			"fieldTypeOverrides": []
+		},
+		"xsltPath": "kaoto-datamapper-8f5bb2dd.xsl",
+		"namespaceMap": {
+			"xs": "http://www.w3.org/2001/XMLSchema",
+			"fn": "http://www.w3.org/2005/xpath-functions"
+		}
+	}
+}
