@@ -34,9 +34,9 @@ No dedicated hardware is required. The application runs entirely within the Red 
 
 | Component | Version | Notes |
 |---|---|---|
-| [Red Hat Developer Sandbox](https://developers.redhat.com/developer-sandbox) | OpenShift 4.x with Pipelines | Free hosted cluster with pre-installed Tekton |
+| [Red Hat Developer Sandbox](https://developers.redhat.com/developer-sandbox) | OpenShift 4.21+ with Pipelines | Free hosted cluster with pre-installed Tekton |
 | Red Hat OpenShift AI shared models | Granite LLM | Activated via the sandbox landing page |
-| `oc` (OpenShift CLI) | 4.x | Download from the OpenShift web console (**?** > **Command line tools**) or [mirror.openshift.com](https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/) |
+| `oc` (OpenShift CLI) | 4.21+ | Download from the OpenShift web console (**?** > **Command line tools**) or [mirror.openshift.com](https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/) |
 | `helm` | 3.x | [Install guide](https://helm.sh/docs/intro/install/) |
 | `tkn` | latest | [Install guide](https://tekton.dev/docs/cli/). Useful for monitoring pipeline runs |
 | `git` | any | To clone this repository |
